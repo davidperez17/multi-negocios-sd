@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/* Tokens de color: referencias var() para que el brandColor del tenant
+   pueda sobreescribir --color-primary en su subtree (landing pública). */
+@theme {
+  --color-*: initial;
+
+  --color-bg: oklch(1 0 0);
+  --color-surface: oklch(0.967 0.005 340);
+  --color-surface-2: oklch(0.94 0.008 340);
+  --color-ink: oklch(0.185 0.015 340);
+  --color-muted: oklch(0.46 0.012 340);
+  --color-border: oklch(0.9 0.008 340);
+  --color-white: oklch(1 0 0);
+
+  --color-primary: oklch(0.5 0.2 340);
+  --color-primary-hover: oklch(0.45 0.2 340);
+  --color-primary-soft: oklch(0.96 0.03 340);
+
+  --color-accent: oklch(0.85 0.1 195);
+  --color-accent-ink: oklch(0.3 0.09 200);
+
+  --color-status-received: oklch(0.46 0.012 340);
+  --color-status-progress: oklch(0.5 0.16 250);
+  --color-status-waiting: oklch(0.78 0.14 80);
+  --color-status-ready: oklch(0.55 0.15 150);
+  --color-danger: oklch(0.55 0.2 25);
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Highlight tenue para avance recién llegado por polling (tracking público) */
+@keyframes update-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.update-enter {
+  animation: update-in 200ms var(--ease-out-quart);
+}
+
+/* Entrada única del hero de la landing (registro brand). Escalonada por --i. */
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-enter {
+  animation: hero-in 450ms var(--ease-out-quart) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-enter {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-enter {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

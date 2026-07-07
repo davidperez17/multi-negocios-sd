@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  tagline      String?
+  description  String?
+  phone        String?
+  whatsapp     String?
+  email        String?
+  address      String?
+  city         String?
+  // Color de marca del tenant en OKLCH, sobreescribe --primary en su landing
+  brandColor   String   @default("oklch(0.5 0.2 340)")
+  logoUrl      String?
+  // Tipos de vehículo que atiende, CSV: CAR,MOTORCYCLE,TRUCK
+  vehicleTypes String   @default("CAR,MOTORCYCLE,TRUCK")
+  // Servicios ofrecidos, separados por saltos de línea (MVP)
+  services     String?
+  schedule     String?
+  createdAt    DateTime @default(now())
+
+  users      User[]
+  customers  Customer[]
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String   @unique
+  passwordHash String
+  // ADMIN | STAFF
+  role         String   @default("STAFF")
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String
+  email     String?
+  createdAt DateTime @default(now())
+
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+
+  @@index([tenantId])
+}
+
+model Vehicle {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  // CAR | MOTORCYCLE | TRUCK
+  type       String
+  brand      String
+  model      String
+  year       Int?
+  plate      String
+  color      String?
+  createdAt  DateTime @default(now())
+
+  workOrders WorkOrder[]
+
+  @@index([tenantId])
+  @@index([customerId])
+}
+
+model WorkOrder {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicleId    String
+  vehicle      Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  // Código público que el cliente usa para consultar, p.ej. "TX-4F8K2M"
+  trackingCode String    @unique
+  // PIN de 5 dígitos que protege el detalle de costos en la página pública.
+  // Default "" solo para poder agregar la columna sin reset; la app siempre lo genera.
+  costCode     String    @default("")
+  // Motivo de ingreso / falla reportada
+  concern      String
+  diagnosis    String?
+  // RECEIVED | DIAGNOSIS | WAITING_APPROVAL | IN_REPAIR | QUALITY_CHECK | READY | DELIVERED | CANCELLED
+  status       String    @default("RECEIVED")
+  estimatedAt  DateTime?
+  deliveredAt  DateTime?
+  // Momento en que el cliente aprobó el presupuesto (con su PIN de costos)
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  items   WorkOrderItem[]
+  updates ProgressUpdate[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model WorkOrderItem {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  // LABOR | PART
+  kind        String
+  description String
+  quantity    Int       @default(1)
+  // Centavos, evita flotantes
+  unitCents   Int
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId])
+}
+
+model ProgressUpdate {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  message     String
+  // Estado de la orden al momento del avance
+  status      String
+  photoUrl    String?
+  // Visible en la página pública de seguimiento
+  isPublic    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId, createdAt])
+}

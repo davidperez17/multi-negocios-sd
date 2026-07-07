@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#2b2e33"/>
+  <rect width="800" height="500" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a3f46"/><stop offset="1" stop-color="#24272b"/>
+    </linearGradient>
+  </defs>
+  <!-- disco de freno -->
+  <circle cx="400" cy="235" r="150" fill="#6b7280"/>
+  <circle cx="400" cy="235" r="148" fill="none" stroke="#4b5563" stroke-width="3"/>
+  <circle cx="400" cy="235" r="95" fill="#374151"/>
+  <circle cx="400" cy="235" r="42" fill="#9ca3af"/>
+  <g fill="#1f2937">
+    <circle cx="400" cy="172" r="9"/><circle cx="460" cy="204" r="9"/><circle cx="452" cy="272" r="9"/>
+    <circle cx="400" cy="298" r="9"/><circle cx="348" cy="272" r="9"/><circle cx="340" cy="204" r="9"/>
+  </g>
+  <g stroke="#525a63" stroke-width="2" opacity="0.7">
+    <circle cx="400" cy="235" r="115" fill="none"/><circle cx="400" cy="235" r="130" fill="none"/>
+  </g>
+  <!-- caliper nuevo -->
+  <path d="M505 130 a150 150 0 0 1 45 105 l-52 0 a98 98 0 0 0 -30 -69 z" fill="#b45309"/>
+  <text x="400" y="445" text-anchor="middle" font-family="system-ui, sans-serif" font-size="26" fill="#e5e7eb">Discos y balatas nuevos instalados</text>
+  <text x="400" y="475" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17" fill="#9ca3af">Foto de demostración — Taller Rodríguez</text>
+</svg>
