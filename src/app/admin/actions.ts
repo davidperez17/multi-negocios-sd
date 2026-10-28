@@ -5,8 +5,15 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
-import { generateTrackingCode, generateCostCode } from "@/lib/format";
-import { ORDER_STATUSES, STATUS_LABELS, type OrderStatus } from "@/lib/status";
+import {
+  addItem as addItemToOrder,
+  changeStatus,
+  createOrder as createOrderForTenant,
+  deleteItem as deleteItemFromOrder,
+  DomainError,
+  type CreateOrderInput,
+} from "@/lib/orders";
+import { normalizePlate, parseDateOnly, parseMoneyToCents, parseQuantity, parseYear } from "@/lib/validation";
 
 async function requireUser() {
   const user = await getCurrentUser();
@@ -37,107 +44,66 @@ export async function logout() {
 export async function createOrder(formData: FormData) {
   const user = await requireUser();
   const tenantId = user.tenantId;
+  const field = (k: string) => String(formData.get(k) ?? "").trim();
 
-  const customerId = String(formData.get("customerId") ?? "");
-  const customerName = String(formData.get("customerName") ?? "").trim();
-  const customerPhone = String(formData.get("customerPhone") ?? "").trim();
-
-  const vehicleId = String(formData.get("vehicleId") ?? "");
-  const vehicleType = String(formData.get("vehicleType") ?? "CAR");
-  const brand = String(formData.get("brand") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim();
-  const yearRaw = String(formData.get("year") ?? "").trim();
-  const plate = String(formData.get("plate") ?? "").trim().toUpperCase();
-
-  const concern = String(formData.get("concern") ?? "").trim();
-  const estimatedAtRaw = String(formData.get("estimatedAt") ?? "").trim();
-
+  const customerId = field("customerId");
+  const vehicleId = field("vehicleId");
+  const concern = field("concern");
   if (!concern) redirect("/admin/ordenes/nueva?error=concern");
 
-  let finalCustomerId = customerId;
-  if (!finalCustomerId) {
-    if (!customerName || !customerPhone) redirect("/admin/ordenes/nueva?error=customer");
-    const customer = await prisma.customer.create({
-      data: { tenantId, name: customerName, phone: customerPhone },
-    });
-    finalCustomerId = customer.id;
+  const estimatedAt = parseDateOnly(field("estimatedAt"));
+  if (estimatedAt === "invalid") redirect("/admin/ordenes/nueva?error=date");
+
+  let customer: CreateOrderInput["customer"];
+  if (!customerId) {
+    const name = field("customerName");
+    const phone = field("customerPhone");
+    if (!name || !phone) redirect("/admin/ordenes/nueva?error=customer");
+    customer = { name, phone };
   }
 
-  let finalVehicleId = vehicleId;
-  if (!finalVehicleId) {
+  let vehicle: CreateOrderInput["vehicle"];
+  if (!vehicleId) {
+    const brand = field("brand");
+    const model = field("model");
+    const plate = normalizePlate(field("plate"));
+    const year = parseYear(field("year"));
     if (!brand || !model || !plate) redirect("/admin/ordenes/nueva?error=vehicle");
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        tenantId,
-        customerId: finalCustomerId,
-        type: vehicleType,
-        brand,
-        model,
-        year: yearRaw ? Number(yearRaw) : null,
-        plate,
-      },
-    });
-    finalVehicleId = vehicle.id;
+    if (year === "invalid") redirect("/admin/ordenes/nueva?error=year");
+    vehicle = { type: field("vehicleType") || "CAR", brand, model, year, plate };
   }
 
-  // Reintenta si el código aleatorio colisiona (unique)
-  let order = null;
-  for (let attempt = 0; attempt < 3 && !order; attempt++) {
-    try {
-      order = await prisma.workOrder.create({
-        data: {
-          tenantId,
-          customerId: finalCustomerId,
-          vehicleId: finalVehicleId,
-          trackingCode: generateTrackingCode(),
-          costCode: generateCostCode(),
-          concern,
-          estimatedAt: estimatedAtRaw ? new Date(estimatedAtRaw) : null,
-          updates: {
-            create: {
-              message: "Vehículo recibido. Ingresa a cola de diagnóstico.",
-              status: "RECEIVED",
-            },
-          },
-        },
-      });
-    } catch {
-      if (attempt === 2) throw new Error("No se pudo generar un código de seguimiento único");
-    }
+  let order: { id: string };
+  try {
+    order = await createOrderForTenant(tenantId, {
+      customerId: customerId || undefined,
+      customer,
+      vehicleId: vehicleId || undefined,
+      vehicle,
+      concern,
+      estimatedAt,
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/nueva?error=${e.code}`);
+    throw e;
   }
 
   revalidatePath("/admin");
-  redirect(`/admin/ordenes/${order!.id}`);
+  redirect(`/admin/ordenes/${order.id}`);
 }
 
 export async function setOrderStatus(formData: FormData) {
   const user = await requireUser();
   const orderId = String(formData.get("orderId") ?? "");
-  const status = String(formData.get("status") ?? "") as OrderStatus;
-  const message = String(formData.get("message") ?? "").trim();
-
-  if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number]) && status !== "CANCELLED") {
-    return;
+  try {
+    await changeStatus(user.tenantId, orderId, String(formData.get("status") ?? ""), {
+      fromStatus: String(formData.get("fromStatus") ?? "") || undefined,
+      message: String(formData.get("message") ?? "").trim(),
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/${orderId}?error=${e.code}`);
+    throw e;
   }
-
-  const order = await prisma.workOrder.findFirst({
-    where: { id: orderId, tenantId: user.tenantId },
-  });
-  if (!order) return;
-
-  await prisma.workOrder.update({
-    where: { id: orderId },
-    data: {
-      status,
-      deliveredAt: status === "DELIVERED" ? new Date() : order.deliveredAt,
-      updates: {
-        create: {
-          message: message || `Estado actualizado: ${STATUS_LABELS[status]}.`,
-          status,
-        },
-      },
-    },
-  });
 
   revalidatePath(`/admin/ordenes/${orderId}`);
   revalidatePath("/admin");
@@ -202,41 +168,28 @@ export async function saveDiagnosis(formData: FormData) {
 export async function addItem(formData: FormData) {
   const user = await requireUser();
   const orderId = String(formData.get("orderId") ?? "");
-  const kind = String(formData.get("kind") ?? "LABOR");
-  const description = String(formData.get("description") ?? "").trim();
-  const quantity = Math.max(1, Number(formData.get("quantity") ?? 1));
-  const price = Number(String(formData.get("price") ?? "0").replace(",", "."));
+  const quantity = parseQuantity(String(formData.get("quantity") ?? ""));
+  const unitCents = parseMoneyToCents(String(formData.get("price") ?? ""));
+  if (quantity === null || unitCents === null) redirect(`/admin/ordenes/${orderId}?error=invalid_item`);
 
-  if (!description || !Number.isFinite(price) || price <= 0) return;
-
-  const order = await prisma.workOrder.findFirst({
-    where: { id: orderId, tenantId: user.tenantId },
-  });
-  if (!order) return;
-
-  await prisma.workOrderItem.create({
-    data: {
-      workOrderId: orderId,
-      kind: kind === "PART" ? "PART" : "LABOR",
-      description,
+  try {
+    await addItemToOrder(user.tenantId, orderId, {
+      kind: String(formData.get("kind") ?? "LABOR"),
+      description: String(formData.get("description") ?? ""),
       quantity,
-      unitCents: Math.round(price * 100),
-    },
-  });
+      unitCents,
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/${orderId}?error=${e.code}`);
+    throw e;
+  }
   revalidatePath(`/admin/ordenes/${orderId}`);
 }
 
 export async function deleteItem(formData: FormData) {
   const user = await requireUser();
-  const itemId = String(formData.get("itemId") ?? "");
-  const item = await prisma.workOrderItem.findUnique({
-    where: { id: itemId },
-    include: { workOrder: { select: { id: true, tenantId: true } } },
-  });
-  if (!item || item.workOrder.tenantId !== user.tenantId) return;
-
-  await prisma.workOrderItem.delete({ where: { id: itemId } });
-  revalidatePath(`/admin/ordenes/${item.workOrder.id}`);
+  const orderId = await deleteItemFromOrder(user.tenantId, String(formData.get("itemId") ?? ""));
+  if (orderId) revalidatePath(`/admin/ordenes/${orderId}`);
 }
 
 // ── Clientes ──────────────────────────────────────────────────────

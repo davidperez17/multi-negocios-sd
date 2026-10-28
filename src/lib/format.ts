@@ -8,7 +8,11 @@ export function formatCents(cents: number): string {
   return currency.format(cents / 100);
 }
 
+// Huso fijo: el server suele correr en UTC y Guatemala no tiene horario de verano
+const TIME_ZONE = "America/Guatemala";
+
 const dateTime = new Intl.DateTimeFormat("es-GT", {
+  timeZone: TIME_ZONE,
   day: "numeric",
   month: "short",
   hour: "numeric",
@@ -17,6 +21,7 @@ const dateTime = new Intl.DateTimeFormat("es-GT", {
 });
 
 const dateOnly = new Intl.DateTimeFormat("es-GT", {
+  timeZone: TIME_ZONE,
   weekday: "long",
   day: "numeric",
   month: "long",

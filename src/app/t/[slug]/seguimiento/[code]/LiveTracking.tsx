@@ -98,24 +98,27 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
   // Aprobación de presupuesto: confirmación en 2 pasos
   const [confirmingApproval, setConfirmingApproval] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [approveError, setApproveError] = useState(false);
+  // "changed": el taller modificó el presupuesto mientras el cliente lo veía
+  const [approveError, setApproveError] = useState<null | "changed" | "generic">(null);
 
   const approveBudget = async () => {
     if (!pin || approving) return;
     setApproving(true);
-    setApproveError(false);
+    setApproveError(null);
     try {
       const res = await fetch(`/api/track/${slug}/${code}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, totalCents: total }),
       });
-      if (!res.ok) throw new Error();
+      const body = res.ok ? null : await res.json().catch(() => null);
       const next = await fetchData(pin);
       if (next) applyData(next);
       setConfirmingApproval(false);
+      if (body?.error === "budget_changed") setApproveError("changed");
+      else if (!res.ok) setApproveError("generic");
     } catch {
-      setApproveError(true);
+      setApproveError("generic");
     } finally {
       setApproving(false);
     }
@@ -311,7 +314,9 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
                 )}
                 {approveError && (
                   <p role="alert" className="mt-3 text-sm text-danger">
-                    No pudimos registrar tu aprobación. Intenta de nuevo o contacta al taller.
+                    {approveError === "changed"
+                      ? "El taller actualizó el presupuesto mientras lo revisabas. Revisa el nuevo total antes de aprobar."
+                      : "No pudimos registrar tu aprobación. Intenta de nuevo o contacta al taller."}
                   </p>
                 )}
               </div>

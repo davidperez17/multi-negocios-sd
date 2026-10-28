@@ -49,3 +49,6 @@ next-env.d.ts
 # runtime tenant uploads (keep demo asset)
 /public/uploads/*
 !/public/uploads/demo/
+
+# vitest test db
+/.vitest/
