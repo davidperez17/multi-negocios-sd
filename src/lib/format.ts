@@ -1,3 +1,5 @@
+import { randomInt } from "crypto";
+
 const currency = new Intl.NumberFormat("es-GT", {
   style: "currency",
   currency: "GTQ",
@@ -37,15 +39,16 @@ export function formatDate(d: Date | string): string {
 
 const TRACKING_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sin 0/O/1/I/L
 
+// Códigos con CSPRNG: Math.random es predecible a partir de valores observados
 export function generateTrackingCode(): string {
   let code = "";
   for (let i = 0; i < 6; i++) {
-    code += TRACKING_ALPHABET[Math.floor(Math.random() * TRACKING_ALPHABET.length)];
+    code += TRACKING_ALPHABET[randomInt(TRACKING_ALPHABET.length)];
   }
   return `TX-${code}`;
 }
 
 // PIN numérico de 5 dígitos que protege el apartado de costos
 export function generateCostCode(): string {
-  return String(Math.floor(10000 + Math.random() * 90000));
+  return String(randomInt(10000, 100000));
 }

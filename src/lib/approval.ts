@@ -1,8 +1,9 @@
 import { prisma } from "./prisma";
+import { checkCostPin } from "./cost-pin";
 
 export type ApproveResult =
   | { ok: true; approvedAt: Date }
-  | { ok: false; error: "not_found" | "invalid_pin" | "not_approvable" | "budget_changed"; status: number };
+  | { ok: false; error: "not_found" | "invalid_pin" | "pin_locked" | "not_approvable" | "budget_changed"; status: number };
 
 /**
  * El cliente aprueba el presupuesto desde la página pública.
@@ -23,7 +24,9 @@ export async function approveBudget(args: {
   });
 
   if (!order || order.tenant.slug !== args.slug) return { ok: false, error: "not_found", status: 404 };
-  if (!order.costCode || args.pin !== order.costCode) return { ok: false, error: "invalid_pin", status: 403 };
+  const pinCheck = await checkCostPin(order, args.pin);
+  if (pinCheck === "locked") return { ok: false, error: "pin_locked", status: 429 };
+  if (pinCheck !== "ok") return { ok: false, error: "invalid_pin", status: 403 };
   // Idempotente: ya estaba aprobado
   if (order.approvedAt) return { ok: true, approvedAt: order.approvedAt };
   if (order.status !== "WAITING_APPROVAL" || order.items.length === 0) {

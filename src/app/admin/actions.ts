@@ -13,6 +13,7 @@ import {
   DomainError,
   type CreateOrderInput,
 } from "@/lib/orders";
+import { savePhoto } from "@/lib/uploads";
 import { normalizePlate, parseDateOnly, parseMoneyToCents, parseQuantity, parseYear } from "@/lib/validation";
 
 async function requireUser() {
@@ -109,26 +110,6 @@ export async function setOrderStatus(formData: FormData) {
   revalidatePath("/admin");
 }
 
-// Tipos de imagen permitidos en fotos de avances
-const PHOTO_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-
-async function savePhoto(file: File, tenantId: string): Promise<string | null> {
-  const ext = PHOTO_TYPES[file.type];
-  if (!ext || file.size === 0 || file.size > PHOTO_MAX_BYTES) return null;
-  const { mkdir, writeFile } = await import("node:fs/promises");
-  const path = await import("node:path");
-  const dir = path.join(process.cwd(), "public", "uploads", tenantId);
-  await mkdir(dir, { recursive: true });
-  const name = `${crypto.randomUUID()}.${ext}`;
-  await writeFile(path.join(dir, name), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/${tenantId}/${name}`;
-}
-
 export async function publishUpdate(formData: FormData) {
   const user = await requireUser();
   const orderId = String(formData.get("orderId") ?? "");
@@ -140,9 +121,13 @@ export async function publishUpdate(formData: FormData) {
   });
   if (!order) return;
 
+  // Si viene foto y no es válida, no se publica el avance: el taller debe enterarse
   const photo = formData.get("photo");
-  const photoUrl =
-    photo instanceof File && photo.size > 0 ? await savePhoto(photo, user.tenantId) : null;
+  let photoUrl: string | null = null;
+  if (photo instanceof File && photo.size > 0) {
+    photoUrl = await savePhoto(photo, user.tenantId);
+    if (!photoUrl) redirect(`/admin/ordenes/${orderId}?error=photo`);
+  }
 
   await prisma.progressUpdate.create({
     data: { workOrderId: orderId, message, status: order.status, photoUrl },

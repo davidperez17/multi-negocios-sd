@@ -96,9 +96,11 @@ model WorkOrder {
   vehicle      Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: NoAction)
   // Código público que el cliente usa para consultar, p.ej. "TX-4F8K2M"
   trackingCode String    @unique
-  // PIN de 5 dígitos que protege el detalle de costos en la página pública.
-  // Default "" solo para poder agregar la columna sin reset; la app siempre lo genera.
-  costCode     String    @default("")
+  // PIN de 5 dígitos que protege el detalle de costos en la página pública
+  costCode     String
+  // Intentos fallidos de PIN y bloqueo temporal (anti fuerza bruta)
+  pinFailures    Int       @default(0)
+  pinLockedUntil DateTime?
   // Motivo de ingreso / falla reportada
   concern      String
   diagnosis    String?
