@@ -6,14 +6,20 @@ import { prisma } from "./prisma";
 const COOKIE_NAME = "taller_session";
 const SESSION_TTL_S = 60 * 60 * 24 * 7; // 7 días
 
-function secret(): string {
-  return process.env.SESSION_SECRET ?? "dev-secret-change-me";
+/** En producción falla cerrado: sin secreto propio cualquiera podría firmar sesiones. */
+export function sessionSecret(): string {
+  const s = process.env.SESSION_SECRET;
+  if (process.env.NODE_ENV === "production") {
+    if (!s || s.length < 32) throw new Error("SESSION_SECRET debe tener al menos 32 caracteres en producción");
+    return s;
+  }
+  return s || "dev-secret-change-me";
 }
 
 type SessionPayload = { userId: string; tenantId: string; exp: number };
 
 function sign(data: string): string {
-  return createHmac("sha256", secret()).update(data).digest("base64url");
+  return createHmac("sha256", sessionSecret()).update(data).digest("base64url");
 }
 
 export function encodeSession(payload: SessionPayload): string {
@@ -46,6 +52,7 @@ export async function createSession(userId: string, tenantId: string) {
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL_S,

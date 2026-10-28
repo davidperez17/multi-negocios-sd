@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
 import {
@@ -14,7 +13,16 @@ import {
   type CreateOrderInput,
 } from "@/lib/orders";
 import { savePhoto } from "@/lib/uploads";
-import { normalizePlate, parseDateOnly, parseMoneyToCents, parseQuantity, parseYear } from "@/lib/validation";
+import { authenticate } from "@/lib/login";
+import { VEHICLE_TYPES } from "@/lib/status";
+import {
+  isValidBrandColor,
+  normalizePlate,
+  parseDateOnly,
+  parseMoneyToCents,
+  parseQuantity,
+  parseYear,
+} from "@/lib/validation";
 
 async function requireUser() {
   const user = await getCurrentUser();
@@ -25,13 +33,9 @@ async function requireUser() {
 // ── Sesión ────────────────────────────────────────────────────────
 
 export async function login(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    redirect("/admin/login?error=1");
-  }
-  await createSession(user.id, user.tenantId);
+  const result = await authenticate(String(formData.get("email") ?? ""), String(formData.get("password") ?? ""));
+  if (!result.ok) redirect(`/admin/login?error=${result.reason === "locked" ? "locked" : "1"}`);
+  await createSession(result.user.id, result.user.tenantId);
   redirect("/admin");
 }
 
@@ -215,14 +219,20 @@ export async function updateTenantSettings(formData: FormData) {
 
   const data: Record<string, string | null> = {};
   for (const f of fields) {
-    const v = String(formData.get(f) ?? "").trim();
+    // Tope de longitud: textos de landing, no documentos
+    const v = String(formData.get(f) ?? "").trim().slice(0, 2000);
     data[f] = v || null;
   }
   // Nombre y color nunca vacíos
   if (!data.name) delete data.name;
   if (!data.brandColor) delete data.brandColor;
+  // El color va a atributos style: solo oklch(), nada de CSS extra
+  else if (!isValidBrandColor(data.brandColor)) redirect("/admin/ajustes?error=color");
 
-  const types = formData.getAll("vehicleTypes").map(String).filter(Boolean);
+  const types = formData
+    .getAll("vehicleTypes")
+    .map(String)
+    .filter((t) => (VEHICLE_TYPES as readonly string[]).includes(t));
   if (types.length > 0) data.vehicleTypes = types.join(",");
 
   await prisma.tenant.update({ where: { id: user.tenantId }, data });

@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { VEHICLE_TYPE_LABELS, VEHICLE_TYPES } from "@/lib/status";
 import { updateTenantSettings } from "../../actions";
+import { safeBrandColor } from "@/lib/validation";
 
 export const metadata = { title: "Ajustes — TallerLink" };
 
@@ -167,7 +168,7 @@ export default async function SettingsPage({
               <span
                 aria-hidden
                 className="h-11 w-11 shrink-0 rounded-(--radius-control) border border-border"
-                style={{ background: t.brandColor }}
+                style={{ background: safeBrandColor(t.brandColor) }}
               />
               <input
                 id="brandColor"
@@ -190,6 +191,11 @@ export default async function SettingsPage({
           {error === "role" && (
             <p role="alert" className="text-sm text-danger">
               Solo el administrador puede guardar cambios.
+            </p>
+          )}
+          {error === "color" && (
+            <p role="alert" className="text-sm text-danger">
+              El color debe tener formato OKLCH, por ejemplo oklch(0.5 0.16 250). No se guardaron los cambios.
             </p>
           )}
 

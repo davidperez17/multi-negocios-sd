@@ -56,7 +56,9 @@ export default async function LoginPage({
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.
+              {error === "locked"
+                ? "Demasiados intentos fallidos. Por seguridad, espera 15 minutos e intenta de nuevo."
+                : "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo."}
             </p>
           )}
           <button

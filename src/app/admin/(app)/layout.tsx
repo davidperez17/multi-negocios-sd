@@ -4,6 +4,7 @@ import { Wrench, LayoutDashboard, ClipboardList, Users, Settings, LogOut, Extern
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "../actions";
 import { NavLink } from "./NavLink";
+import { safeBrandColor } from "@/lib/validation";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -24,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="px-4 py-3 md:py-5 flex items-center gap-2.5 min-w-0">
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-              style={{ background: user.tenant.brandColor }}
+              style={{ background: safeBrandColor(user.tenant.brandColor) }}
             >
               <Wrench size={15} aria-hidden />
             </span>

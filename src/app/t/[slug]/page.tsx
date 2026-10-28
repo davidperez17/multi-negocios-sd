@@ -46,7 +46,7 @@ export default async function TenantLanding({
   const services = (tenant.services ?? "").split("\n").filter(Boolean);
   const types = tenant.vehicleTypes
     .split(",")
-    .filter((t): t is VehicleType => t in VEHICLE_TYPE_LABELS);
+    .filter((t): t is VehicleType => Object.hasOwn(VEHICLE_TYPE_LABELS, t));
   const vehicleWords = types.map((t) => VEHICLE_TYPE_LABELS[t].toLowerCase());
   const plurals = types.map((t) => VEHICLE_TYPE_PLURALS[t]);
   const vehiclePhrase =

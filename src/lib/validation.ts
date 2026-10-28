@@ -66,3 +66,8 @@ const OKLCH_RE = /^oklch\(\s*\d*\.?\d+%?\s+\d*\.?\d+\s+\d*\.?\d+(\s*\/\s*\d*\.?\
 export function isValidBrandColor(c: string): boolean {
   return OKLCH_RE.test(c.trim());
 }
+
+/** brandColor listo para un atributo style; si es inválido, el color por defecto. */
+export function safeBrandColor(c: string): string {
+  return isValidBrandColor(c) ? c.trim() : DEFAULT_BRAND_COLOR;
+}

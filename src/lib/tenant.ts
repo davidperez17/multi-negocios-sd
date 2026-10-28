@@ -1,11 +1,14 @@
 import { prisma } from "./prisma";
+import { safeBrandColor } from "./validation";
 
 export async function getTenantBySlug(slug: string) {
   return prisma.tenant.findUnique({ where: { slug } });
 }
 
 /** Variables CSS que aplican el branding del tenant a su subtree público. */
-export function tenantThemeVars(brandColor: string): React.CSSProperties {
+export function tenantThemeVars(rawColor: string): React.CSSProperties {
+  // Se escribe en atributos style: un valor inválido o con CSS extra cae al color por defecto
+  const brandColor = safeBrandColor(rawColor);
   return {
     "--color-primary": brandColor,
     "--color-primary-hover": `color-mix(in oklch, ${brandColor} 88%, black)`,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Wrench, LayoutDashboard } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { VEHICLE_TYPE_PLURALS, type VehicleType } from "@/lib/status";
+import { safeBrandColor } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function Home() {
           {tenants.map((t) => {
             const types = t.vehicleTypes
               .split(",")
-              .filter((v): v is VehicleType => v in VEHICLE_TYPE_PLURALS)
+              .filter((v): v is VehicleType => Object.hasOwn(VEHICLE_TYPE_PLURALS, v))
               .map((v) => VEHICLE_TYPE_PLURALS[v])
               .join(" · ");
             return (
@@ -55,7 +56,7 @@ export default async function Home() {
                 >
                   <span
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
-                    style={{ background: t.brandColor }}
+                    style={{ background: safeBrandColor(t.brandColor) }}
                   >
                     <Wrench size={18} aria-hidden />
                   </span>
