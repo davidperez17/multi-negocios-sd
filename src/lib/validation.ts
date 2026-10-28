@@ -71,3 +71,27 @@ export function isValidBrandColor(c: string): boolean {
 export function safeBrandColor(c: string): string {
   return isValidBrandColor(c) ? c.trim() : DEFAULT_BRAND_COLOR;
 }
+
+// ── Cuentas (registro y equipo) ───────────────────────────────────
+
+export function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+export function isValidEmail(email: string): boolean {
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/** 8+ caracteres; tope de 72 porque bcrypt ignora lo que sigue. */
+export function isValidPassword(pw: string): boolean {
+  return pw.length >= 8 && Buffer.byteLength(pw) <= 72;
+}
+
+/** Teléfono de Guatemala (8 dígitos, con o sin +502) → "+502 5512 3456". */
+export function normalizeGtPhone(raw: string): string | null {
+  let digits = raw.replace(/[\s()+-]/g, "");
+  if (!/^\d+$/.test(digits)) return null;
+  if (digits.length === 11 && digits.startsWith("502")) digits = digits.slice(3);
+  if (digits.length !== 8) return null;
+  return `+502 ${digits.slice(0, 4)} ${digits.slice(4)}`;
+}

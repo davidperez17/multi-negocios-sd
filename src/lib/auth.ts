@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "./prisma";
+import { tenantAccess } from "./access";
 
 const COOKIE_NAME = "taller_session";
 const SESSION_TTL_S = 60 * 60 * 24 * 7; // 7 días
@@ -71,20 +72,30 @@ export async function getSession(): Promise<SessionPayload | null> {
   return decodeSession(token);
 }
 
-/** Usuario autenticado con su tenant, o null. Para páginas del admin. */
-export async function getCurrentUser() {
-  const session = await getSession();
-  if (!session) return null;
+/** Usuario de una sesión válida, o null si ya no existe, fue desactivado o cambió de taller. */
+export async function sessionUser(session: SessionPayload) {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: { tenant: true },
   });
+  if (!user || !user.active || user.tenantId !== session.tenantId) return null;
   return user;
 }
 
-/** Como getCurrentUser, pero redirige a login si no hay sesión. Para pages del admin. */
+/** Usuario autenticado con su tenant, o null. Para páginas del admin. */
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session) return null;
+  return sessionUser(session);
+}
+
+/**
+ * Como getCurrentUser, pero redirige a login si no hay sesión y a la pantalla de plan
+ * si la prueba o el pago vencieron. Para pages y server actions del panel.
+ */
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/admin/login");
+  if (tenantAccess(user.tenant).state === "expired") redirect("/admin/plan");
   return user;
 }

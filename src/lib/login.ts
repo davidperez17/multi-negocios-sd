@@ -15,7 +15,8 @@ export type AuthResult =
 export async function authenticate(rawEmail: string, password: string): Promise<AuthResult> {
   const email = rawEmail.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
+  // Desactivado = como si no existiera (sin revelar que la cuenta existe)
+  if (!user || !user.active) {
     await bcrypt.compare(password, DUMMY_HASH);
     return { ok: false, reason: "invalid" };
   }

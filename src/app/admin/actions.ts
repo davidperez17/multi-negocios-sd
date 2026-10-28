@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
+import { createSession, destroySession, requireUser } from "@/lib/auth";
 import {
   addItem as addItemToOrder,
   changeStatus,
@@ -14,6 +14,8 @@ import {
 } from "@/lib/orders";
 import { savePhoto } from "@/lib/uploads";
 import { authenticate } from "@/lib/login";
+import { registerWorkshop } from "@/lib/signup";
+import { addWorker, resetWorkerPassword, setWorkerActive, setWorkerRole } from "@/lib/team";
 import { VEHICLE_TYPES } from "@/lib/status";
 import {
   isValidBrandColor,
@@ -24,12 +26,6 @@ import {
   parseYear,
 } from "@/lib/validation";
 
-async function requireUser() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
-  return user;
-}
-
 // ── Sesión ────────────────────────────────────────────────────────
 
 export async function login(formData: FormData) {
@@ -37,6 +33,28 @@ export async function login(formData: FormData) {
   if (!result.ok) redirect(`/admin/login?error=${result.reason === "locked" ? "locked" : "1"}`);
   await createSession(result.user.id, result.user.tenantId);
   redirect("/admin");
+}
+
+export async function signup(formData: FormData) {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  // Honeypot: campo oculto que una persona deja vacío y un bot suele llenar
+  if (field("website")) redirect("/registro?error=invalid_name");
+
+  let res: { tenantId: string; userId: string };
+  try {
+    res = await registerWorkshop({
+      workshopName: field("workshopName"),
+      ownerName: field("ownerName"),
+      whatsapp: field("whatsapp"),
+      email: field("email"),
+      password: field("password"),
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/registro?error=${e.code}`);
+    throw e;
+  }
+  await createSession(res.userId, res.tenantId);
+  redirect("/admin?bienvenida=1");
 }
 
 export async function logout() {
@@ -239,4 +257,54 @@ export async function updateTenantSettings(formData: FormData) {
   revalidatePath("/admin/ajustes");
   revalidatePath(`/t/${user.tenant.slug}`);
   redirect("/admin/ajustes?saved=1");
+}
+
+// ── Equipo ────────────────────────────────────────────────────────
+
+async function teamAction(fn: () => Promise<unknown>, okFlag: string) {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/equipo?error=${e.code}`);
+    throw e;
+  }
+  revalidatePath("/admin/equipo");
+  redirect(`/admin/equipo?ok=${okFlag}`);
+}
+
+export async function createWorker(formData: FormData) {
+  const user = await requireUser();
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await teamAction(
+    () =>
+      addWorker(user, {
+        name: field("name"),
+        email: field("email"),
+        password: field("password"),
+        role: field("role") || "STAFF",
+      }),
+    "added"
+  );
+}
+
+export async function toggleWorker(formData: FormData) {
+  const user = await requireUser();
+  const active = formData.get("active") === "1";
+  await teamAction(() => setWorkerActive(user, String(formData.get("userId") ?? ""), active), active ? "enabled" : "disabled");
+}
+
+export async function changeWorkerRole(formData: FormData) {
+  const user = await requireUser();
+  await teamAction(
+    () => setWorkerRole(user, String(formData.get("userId") ?? ""), String(formData.get("role") ?? "")),
+    "role"
+  );
+}
+
+export async function changeWorkerPassword(formData: FormData) {
+  const user = await requireUser();
+  await teamAction(
+    () => resetWorkerPassword(user, String(formData.get("userId") ?? ""), String(formData.get("password") ?? "")),
+    "password"
+  );
 }

@@ -26,6 +26,10 @@ model Tenant {
   // Servicios ofrecidos, separados por saltos de línea (MVP)
   services     String?
   schedule     String?
+  // Prueba gratis (registro propio). null = taller creado a mano, sin prueba
+  trialEndsAt  DateTime?
+  // Plan pagado vigente hasta esta fecha; se extiende con `pnpm tenant:activate`
+  paidUntil    DateTime?
   createdAt    DateTime @default(now())
 
   users      User[]
@@ -43,6 +47,8 @@ model User {
   passwordHash String
   // ADMIN | STAFF
   role         String   @default("STAFF")
+  // Trabajador desactivado por el ADMIN: no entra y su sesión deja de valer
+  active       Boolean  @default(true)
   // Intentos fallidos de login y bloqueo temporal (anti fuerza bruta)
   failedLogins Int       @default(0)
   lockedUntil  DateTime?
