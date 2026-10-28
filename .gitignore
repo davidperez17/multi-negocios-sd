@@ -52,3 +52,6 @@ next-env.d.ts
 
 # vitest test db
 /.vitest/
+
+# brainstorm companion
+/.superpowers/
