@@ -84,7 +84,7 @@ export function isValidEmail(email: string): boolean {
 
 /** 8+ caracteres; tope de 72 porque bcrypt ignora lo que sigue. */
 export function isValidPassword(pw: string): boolean {
-  return pw.length >= 8 && Buffer.byteLength(pw) <= 72;
+  return pw.length >= 8 && new TextEncoder().encode(pw).length <= 72;
 }
 
 /** Teléfono de Guatemala (8 dígitos, con o sin +502) → "+502 5512 3456". */
@@ -94,4 +94,10 @@ export function normalizeGtPhone(raw: string): string | null {
   if (digits.length === 11 && digits.startsWith("502")) digits = digits.slice(3);
   if (digits.length !== 8) return null;
   return `+502 ${digits.slice(0, 4)} ${digits.slice(4)}`;
+}
+
+/** Número para https://wa.me/<n>: solo dígitos con código de país, o null si no hay. */
+export function waNumber(raw: string | null | undefined): string | null {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  return digits || null;
 }

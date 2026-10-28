@@ -26,9 +26,18 @@ function requireAdmin(actor: Actor) {
 }
 
 async function findMember(tx: Tx, actor: Actor, userId: string) {
-  const user = await tx.user.findFirst({ where: { id: userId, tenantId: actor.tenantId } });
+  const user = await tx.user.findFirst({
+    where: { id: userId, tenantId: actor.tenantId },
+    include: { tenant: { select: { ownerId: true } } },
+  });
   if (!user) throw new DomainError("user_not_found");
-  return user;
+  return { ...user, isOwner: user.tenant.ownerId === user.id };
+}
+
+/** Solo el dueño se toca a sí mismo, y ni él puede quitarse el rol ni el acceso. */
+function guardOwner(actor: Actor, target: { id: string; isOwner: boolean }, removesAccess: boolean) {
+  if (!target.isOwner) return;
+  if (actor.id !== target.id || removesAccess) throw new DomainError("owner_protected");
 }
 
 /** Tras el cambio debe quedar al menos un ADMIN activo en el taller. */
@@ -65,7 +74,7 @@ export async function addWorker(
 export async function setWorkerActive(actor: Actor, userId: string, active: boolean) {
   requireAdmin(actor);
   await prisma.$transaction(async (tx) => {
-    await findMember(tx, actor, userId);
+    guardOwner(actor, await findMember(tx, actor, userId), !active);
     await tx.user.update({ where: { id: userId }, data: { active } });
     if (!active) await assertAdminRemains(tx, actor.tenantId);
   });
@@ -75,7 +84,7 @@ export async function setWorkerRole(actor: Actor, userId: string, role: string) 
   requireAdmin(actor);
   if (!isRole(role)) throw new DomainError("invalid_role");
   await prisma.$transaction(async (tx) => {
-    await findMember(tx, actor, userId);
+    guardOwner(actor, await findMember(tx, actor, userId), role !== "ADMIN");
     await tx.user.update({ where: { id: userId }, data: { role } });
     await assertAdminRemains(tx, actor.tenantId);
   });
@@ -86,10 +95,10 @@ export async function resetWorkerPassword(actor: Actor, userId: string, password
   if (!isValidPassword(password)) throw new DomainError("weak_password");
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.$transaction(async (tx) => {
-    await findMember(tx, actor, userId);
+    guardOwner(actor, await findMember(tx, actor, userId), false);
     await tx.user.update({
       where: { id: userId },
-      data: { passwordHash, failedLogins: 0, lockedUntil: null },
+      data: { passwordHash, failedLogins: 0, lockedUntil: null, sessionVersion: { increment: 1 } },
     });
   });
 }

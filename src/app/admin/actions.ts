@@ -15,6 +15,7 @@ import {
 import { savePhoto } from "@/lib/uploads";
 import { authenticate } from "@/lib/login";
 import { registerWorkshop } from "@/lib/signup";
+import { allowByIp } from "@/lib/rate-limit";
 import { addWorker, resetWorkerPassword, setWorkerActive, setWorkerRole } from "@/lib/team";
 import { VEHICLE_TYPES } from "@/lib/status";
 import {
@@ -28,29 +29,45 @@ import {
 
 // ── Sesión ────────────────────────────────────────────────────────
 
+// Topes por IP contra abuso (además del bloqueo por cuenta en login.ts)
+const SIGNUPS_PER_IP_PER_HOUR = 5;
+const LOGINS_PER_IP_PER_15MIN = 30;
+
 export async function login(formData: FormData) {
+  if (!(await allowByIp("login", LOGINS_PER_IP_PER_15MIN, 15 * 60_000))) {
+    redirect("/admin/login?error=locked");
+  }
   const result = await authenticate(String(formData.get("email") ?? ""), String(formData.get("password") ?? ""));
   if (!result.ok) redirect(`/admin/login?error=${result.reason === "locked" ? "locked" : "1"}`);
-  await createSession(result.user.id, result.user.tenantId);
+  await createSession(result.user.id, result.user.tenantId, result.user.sessionVersion);
   redirect("/admin");
 }
 
-export async function signup(formData: FormData) {
+export type SignupState = {
+  error?: string;
+  // Lo que escribió (sin contraseña) para no vaciar el formulario si hay un error
+  values?: { workshopName: string; ownerName: string; whatsapp: string; email: string };
+};
+
+export async function signup(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const field = (k: string) => String(formData.get(k) ?? "");
+  const values = {
+    workshopName: field("workshopName"),
+    ownerName: field("ownerName"),
+    whatsapp: field("whatsapp"),
+    email: field("email"),
+  };
   // Honeypot: campo oculto que una persona deja vacío y un bot suele llenar
-  if (field("website")) redirect("/registro?error=invalid_name");
+  if (field("website")) return { error: "retry", values };
+  if (!(await allowByIp("signup", SIGNUPS_PER_IP_PER_HOUR, 60 * 60_000))) {
+    return { error: "rate_limited", values };
+  }
 
   let res: { tenantId: string; userId: string };
   try {
-    res = await registerWorkshop({
-      workshopName: field("workshopName"),
-      ownerName: field("ownerName"),
-      whatsapp: field("whatsapp"),
-      email: field("email"),
-      password: field("password"),
-    });
+    res = await registerWorkshop({ ...values, password: field("password") });
   } catch (e) {
-    if (e instanceof DomainError) redirect(`/registro?error=${e.code}`);
+    if (e instanceof DomainError) return { error: e.code, values };
     throw e;
   }
   await createSession(res.userId, res.tenantId);

@@ -9,6 +9,7 @@ import { VehicleTypeIcon, vehicleLabel } from "@/components/VehicleTypeIcon";
 import { STATUS_HINTS, type OrderStatus } from "@/lib/status";
 import { formatCents, formatDate, formatDateTime } from "@/lib/format";
 import type { TrackingData } from "@/lib/tracking";
+import { waNumber } from "@/lib/validation";
 
 export type { TrackingData };
 
@@ -358,7 +359,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
           <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
             {tenant.whatsapp && (
               <a
-                href={`https://wa.me/${tenant.whatsapp}?text=Hola,%20consulto%20por%20mi%20orden%20${order.trackingCode}`}
+                href={`https://wa.me/${waNumber(tenant.whatsapp)}?text=Hola,%20consulto%20por%20mi%20orden%20${order.trackingCode}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-11 items-center gap-2 rounded-(--radius-control) bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover transition-colors duration-150"

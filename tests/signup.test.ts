@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { authenticate } from "@/lib/login";
 import { DomainError } from "@/lib/orders";
 import { registerWorkshop, slugify, TRIAL_DAYS } from "@/lib/signup";
-import { isValidEmail, isValidPassword, normalizeGtPhone } from "@/lib/validation";
+import { isValidEmail, isValidPassword, normalizeGtPhone, waNumber } from "@/lib/validation";
 import { resetDb } from "./helpers";
 
 beforeEach(resetDb);
@@ -47,6 +47,12 @@ describe("validación de registro", () => {
     expect(normalizeGtPhone(raw)).toBeNull();
   });
 
+  it("waNumber deja solo dígitos para wa.me", () => {
+    expect(waNumber("+502 5512-3456")).toBe("50255123456");
+    expect(waNumber(null)).toBeNull();
+    expect(waNumber(" - ")).toBeNull();
+  });
+
   it("email y contraseña", () => {
     expect(isValidEmail("a@b.gt")).toBe(true);
     expect(isValidEmail("sin-arroba")).toBe(false);
@@ -62,7 +68,9 @@ describe("registerWorkshop", () => {
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: res.tenantId } });
     expect(tenant.slug).toBe("taller-mendez-hermanos");
     expect(tenant.name).toBe("Taller Méndez Hermanos");
-    expect(tenant.whatsapp).toBe("+502 5512 3456");
+    // wa.me solo acepta dígitos con código de país
+    expect(tenant.whatsapp).toBe("50255123456");
+    expect(tenant.phone).toBe("+502 5512 3456");
     expect(tenant.trialEndsAt?.toISOString()).toBe("2026-11-27T15:00:00.000Z");
     expect(tenant.paidUntil).toBeNull();
 

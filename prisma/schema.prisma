@@ -30,6 +30,8 @@ model Tenant {
   trialEndsAt  DateTime?
   // Plan pagado vigente hasta esta fecha; se extiende con `pnpm tenant:activate`
   paidUntil    DateTime?
+  // Dueño que se registró: otros ADMIN no pueden degradarlo, desactivarlo ni cambiar su contraseña
+  ownerId      String?
   createdAt    DateTime @default(now())
 
   users      User[]
@@ -49,6 +51,8 @@ model User {
   role         String   @default("STAFF")
   // Trabajador desactivado por el ADMIN: no entra y su sesión deja de valer
   active       Boolean  @default(true)
+  // Se incrementa al resetear la contraseña: invalida las sesiones ya emitidas
+  sessionVersion Int    @default(0)
   // Intentos fallidos de login y bloqueo temporal (anti fuerza bruta)
   failedLogins Int       @default(0)
   lockedUntil  DateTime?
@@ -161,4 +165,11 @@ model ProgressUpdate {
   createdAt   DateTime  @default(now())
 
   @@index([workOrderId, createdAt])
+}
+
+// Límite de intentos por clave (p. ej. "signup:<ip>") en ventana fija. Sin relación a tenant.
+model RateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
 }

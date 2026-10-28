@@ -20,16 +20,25 @@ export function tenantAccess(
   return { state: "expired", daysLeft: null };
 }
 
-/** Registra un pago: suma meses desde el vencimiento vigente o, si ya venció, desde hoy. */
+/** Registra un pago: suma meses desde el fin del plan o de la prueba vigente, o desde hoy. */
 export async function activateTenant(slug: string, months: number, now = new Date()) {
   if (!Number.isInteger(months) || months < 1 || months > 24) throw new Error("Meses debe ser un entero de 1 a 24");
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) throw new Error(`No existe un taller con slug "${slug}"`);
 
-  const from = tenant.paidUntil && tenant.paidUntil > now ? tenant.paidUntil : now;
-  const paidUntil = new Date(from);
-  paidUntil.setUTCMonth(paidUntil.getUTCMonth() + months);
-  return prisma.tenant.update({ where: { slug }, data: { paidUntil } });
+  // El mes pagado empieza cuando termina lo que ya tiene: plan vigente, prueba o hoy
+  const from = new Date(Math.max(now.getTime(), tenant.paidUntil?.getTime() ?? 0, tenant.trialEndsAt?.getTime() ?? 0));
+  return prisma.tenant.update({ where: { slug }, data: { paidUntil: addMonthsClamped(from, months) } });
+}
+
+/** Suma meses sin desbordar: 31 de enero + 1 = 28/29 de febrero. */
+function addMonthsClamped(d: Date, months: number): Date {
+  const out = new Date(d);
+  out.setUTCDate(1);
+  out.setUTCMonth(out.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(out.getUTCFullYear(), out.getUTCMonth() + 1, 0)).getUTCDate();
+  out.setUTCDate(Math.min(d.getUTCDate(), lastDay));
+  return out;
 }
 
 /** WhatsApp de ventas para activar el plan (env SALES_WHATSAPP, solo dígitos con código de país). */

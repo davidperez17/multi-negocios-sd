@@ -44,6 +44,20 @@ describe("activateTenant", () => {
     expect(t.paidUntil?.toISOString()).toBe("2027-01-07T15:00:00.000Z");
   });
 
+  it("pagar durante la prueba no le quita los días que le quedaban", async () => {
+    await prisma.tenant.create({ data: { slug: "d", name: "D", trialEndsAt: days(25) } });
+    const t = await activateTenant("d", 1, NOW);
+    // fin de prueba 2026-11-22 + 1 mes
+    expect(t.paidUntil?.toISOString()).toBe("2026-12-22T15:00:00.000Z");
+  });
+
+  it("31 de enero + 1 mes = fin de febrero, no marzo", async () => {
+    const jan31 = new Date("2027-01-31T15:00:00Z");
+    await prisma.tenant.create({ data: { slug: "e", name: "E", paidUntil: jan31 } });
+    const t = await activateTenant("e", 1, new Date("2027-01-10T00:00:00Z"));
+    expect(t.paidUntil?.toISOString()).toBe("2027-02-28T15:00:00.000Z");
+  });
+
   it("slug inexistente o meses inválidos lanzan", async () => {
     await expect(activateTenant("nope", 1, NOW)).rejects.toThrow();
     await prisma.tenant.create({ data: { slug: "c", name: "C" } });

@@ -13,11 +13,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   forbidden: "Solo un administrador puede cambiar el equipo.",
   invalid_name: "Escribe el nombre del trabajador.",
   invalid_email: "Revisa el correo, parece incompleto.",
-  weak_password: "La contraseña debe tener al menos 8 caracteres.",
+  weak_password: "La contraseña debe tener entre 8 y 72 caracteres.",
   invalid_role: "Elige un rol válido.",
   email_taken: "Ese correo ya tiene una cuenta en TallerLink.",
   user_not_found: "Ese usuario no es de tu taller.",
   last_admin: "El taller debe quedar con al menos un administrador activo.",
+  owner_protected: "Al dueño del taller no se le puede quitar el rol, el acceso ni cambiar la contraseña desde otra cuenta.",
 };
 
 const OK_MESSAGES: Record<string, string> = {
@@ -119,12 +120,16 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <ul className="mt-8 divide-y divide-border rounded-(--radius-card) border border-border max-w-3xl">
         {members.map((m) => {
           const isSelf = m.id === user.id;
+          const isOwner = m.id === user.tenant.ownerId;
+          // Al dueño solo lo gestiona él mismo, y solo su contraseña
+          const canManage = isAdmin && (!isOwner || isSelf);
           return (
             <li key={m.id} className={`px-4 py-4 ${m.active ? "" : "bg-surface"}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="font-medium min-w-0 break-words">
                   {m.name}
                   {isSelf && <span className="text-muted font-normal"> (tú)</span>}
+                  {isOwner && <span className="text-muted font-normal"> · Dueño</span>}
                 </p>
                 <p className="text-sm text-muted">
                   {ROLE_LABELS[m.role as Role] ?? m.role}
@@ -133,31 +138,33 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
               </div>
               <p className="text-sm text-muted break-all">{m.email}</p>
 
-              {isAdmin && (
+              {canManage && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <form action={changeWorkerRole} className="flex gap-2">
-                    <input type="hidden" name="userId" value={m.id} />
-                    <label htmlFor={`role-${m.id}`} className="sr-only">
-                      Rol de {m.name}
-                    </label>
-                    <select
-                      id={`role-${m.id}`}
-                      name="role"
-                      defaultValue={m.role}
-                      className="h-10 rounded-(--radius-control) border border-border bg-bg px-2.5 text-sm"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="submit" className={btnCls}>
-                      Cambiar rol
-                    </button>
-                  </form>
+                  {!isOwner && (
+                    <form action={changeWorkerRole} className="flex gap-2">
+                      <input type="hidden" name="userId" value={m.id} />
+                      <label htmlFor={`role-${m.id}`} className="sr-only">
+                        Rol de {m.name}
+                      </label>
+                      <select
+                        id={`role-${m.id}`}
+                        name="role"
+                        defaultValue={m.role}
+                        className="h-10 rounded-(--radius-control) border border-border bg-bg px-2.5 text-sm"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit" className={btnCls}>
+                        Cambiar rol
+                      </button>
+                    </form>
+                  )}
 
-                  {!isSelf && (
+                  {!isSelf && !isOwner && (
                     <form action={toggleWorker}>
                       <input type="hidden" name="userId" value={m.id} />
                       <input type="hidden" name="active" value={m.active ? "0" : "1"} />

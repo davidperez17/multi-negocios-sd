@@ -18,6 +18,7 @@ import {
   VEHICLE_TYPE_READY,
   type VehicleType,
 } from "@/lib/status";
+import { waNumber } from "@/lib/validation";
 import { TrackingSearch } from "./TrackingSearch";
 
 export async function generateMetadata({
@@ -265,7 +266,7 @@ export default async function TenantLanding({
           </div>
           {tenant.whatsapp && (
             <a
-              href={`https://wa.me/${tenant.whatsapp}`}
+              href={`https://wa.me/${waNumber(tenant.whatsapp)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex w-full lg:w-auto items-center justify-center gap-2.5 h-14 px-8 rounded-full text-white font-semibold shadow-xl shadow-primary/30 hover:opacity-90 transition-opacity duration-150"

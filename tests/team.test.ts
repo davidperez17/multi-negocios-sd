@@ -71,17 +71,35 @@ describe("gestión de trabajadores", () => {
     await expect(resetWorkerPassword(a, wb.id, "nueva1234")).rejects.toThrow(new DomainError("user_not_found"));
   });
 
-  it("nunca deja al taller sin un ADMIN activo", async () => {
+  it("el dueño no puede quitarse a sí mismo el rol ni el acceso", async () => {
     const owner = await workshop();
-    await expect(setWorkerActive(owner, owner.id, false)).rejects.toThrow(new DomainError("last_admin"));
-    await expect(setWorkerRole(owner, owner.id, "STAFF")).rejects.toThrow(new DomainError("last_admin"));
+    await expect(setWorkerActive(owner, owner.id, false)).rejects.toThrow(new DomainError("owner_protected"));
+    await expect(setWorkerRole(owner, owner.id, "STAFF")).rejects.toThrow(new DomainError("owner_protected"));
   });
 
-  it("con otro ADMIN activo sí se puede degradar al dueño", async () => {
+  it("taller sin dueño registrado (creado a mano) nunca queda sin ADMIN activo", async () => {
+    const tenant = await prisma.tenant.create({ data: { slug: "manual", name: "Manual" } });
+    const admin = await prisma.user.create({
+      data: { tenantId: tenant.id, name: "A", email: "a@manual.gt", passwordHash: "x", role: "ADMIN" },
+    });
+    await expect(setWorkerActive(admin, admin.id, false)).rejects.toThrow(new DomainError("last_admin"));
+    await expect(setWorkerRole(admin, admin.id, "STAFF")).rejects.toThrow(new DomainError("last_admin"));
+  });
+
+  it("otro ADMIN no puede degradar, desactivar ni cambiarle la contraseña al dueño", async () => {
     const owner = await workshop();
     const second = await addWorker(owner, { ...mecanico, role: "ADMIN" });
-    await setWorkerRole(second, owner.id, "STAFF");
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: owner.id } })).role).toBe("STAFF");
+    await expect(setWorkerRole(second, owner.id, "STAFF")).rejects.toThrow(new DomainError("owner_protected"));
+    await expect(setWorkerActive(second, owner.id, false)).rejects.toThrow(new DomainError("owner_protected"));
+    await expect(resetWorkerPassword(second, owner.id, "robada123")).rejects.toThrow(new DomainError("owner_protected"));
+    expect((await authenticate("dueno" + n + "@t.gt", "segura123")).ok).toBe(true);
+  });
+
+  it("el dueño sí gestiona a otro ADMIN", async () => {
+    const owner = await workshop();
+    const second = await addWorker(owner, { ...mecanico, role: "ADMIN" });
+    await setWorkerRole(owner, second.id, "STAFF");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: second.id } })).role).toBe("STAFF");
   });
 
   it("resetear contraseña cambia el acceso y quita el bloqueo", async () => {
@@ -103,5 +121,17 @@ describe("sesión de un trabajador desactivado", () => {
     expect((await sessionUser(payload))?.id).toBe(w.id);
     await setWorkerActive(owner, w.id, false);
     expect(await sessionUser(payload)).toBeNull();
+  });
+
+  it("resetear la contraseña invalida las sesiones abiertas", async () => {
+    const { sessionUser } = await import("@/lib/auth");
+    const owner = await workshop();
+    const w = await addWorker(owner, mecanico);
+    const payload = { userId: w.id, tenantId: w.tenantId, v: w.sessionVersion, exp: Date.now() / 1000 + 60 };
+    expect((await sessionUser(payload))?.id).toBe(w.id);
+    await resetWorkerPassword(owner, w.id, "nueva1234");
+    expect(await sessionUser(payload)).toBeNull();
+    const fresh = await authenticate("luis@t.gt", "nueva1234");
+    expect(fresh.ok && (await sessionUser({ ...payload, v: fresh.user.sessionVersion }))?.id).toBe(w.id);
   });
 });

@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 import { DomainError } from "./orders";
-import { isValidEmail, isValidPassword, normalizeEmail, normalizeGtPhone } from "./validation";
+import { isValidEmail, isValidPassword, normalizeEmail, normalizeGtPhone, waNumber } from "./validation";
 
 // Registro propio de un taller nuevo: crea el tenant, su dueño (ADMIN) y arranca la prueba.
 
@@ -41,10 +41,10 @@ export async function registerWorkshop(
   const workshopName = input.workshopName.trim();
   const ownerName = input.ownerName.trim();
   const email = normalizeEmail(input.email);
-  const whatsapp = normalizeGtPhone(input.whatsapp);
+  const phone = normalizeGtPhone(input.whatsapp);
   if (workshopName.length < 2 || workshopName.length > 80) throw new DomainError("invalid_name");
   if (!ownerName || ownerName.length > 80) throw new DomainError("invalid_owner");
-  if (!whatsapp) throw new DomainError("invalid_phone");
+  if (!phone) throw new DomainError("invalid_phone");
   if (!isValidEmail(email)) throw new DomainError("invalid_email");
   if (!isValidPassword(input.password)) throw new DomainError("weak_password");
 
@@ -68,11 +68,12 @@ export async function registerWorkshop(
         for (let i = 2; used.has(slug); i++) slug = `${base}-${i}`;
 
         const tenant = await tx.tenant.create({
-          data: { slug, name: workshopName, whatsapp, phone: whatsapp, email, trialEndsAt },
+          data: { slug, name: workshopName, whatsapp: waNumber(phone), phone, email, trialEndsAt },
         });
         const user = await tx.user.create({
           data: { tenantId: tenant.id, name: ownerName, email, passwordHash, role: "ADMIN" },
         });
+        await tx.tenant.update({ where: { id: tenant.id }, data: { ownerId: user.id } });
         return { tenantId: tenant.id, userId: user.id, slug };
       });
     } catch (e) {

@@ -17,7 +17,8 @@ export function sessionSecret(): string {
   return s || "dev-secret-change-me";
 }
 
-type SessionPayload = { userId: string; tenantId: string; exp: number };
+// v = User.sessionVersion al emitir la sesión; si cambió (reset de contraseña), la sesión ya no vale
+type SessionPayload = { userId: string; tenantId: string; v?: number; exp: number };
 
 function sign(data: string): string {
   return createHmac("sha256", sessionSecret()).update(data).digest("base64url");
@@ -44,10 +45,11 @@ export function decodeSession(token: string): SessionPayload | null {
   }
 }
 
-export async function createSession(userId: string, tenantId: string) {
+export async function createSession(userId: string, tenantId: string, sessionVersion = 0) {
   const token = encodeSession({
     userId,
     tenantId,
+    v: sessionVersion,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S,
   });
   const store = await cookies();
@@ -72,13 +74,14 @@ export async function getSession(): Promise<SessionPayload | null> {
   return decodeSession(token);
 }
 
-/** Usuario de una sesión válida, o null si ya no existe, fue desactivado o cambió de taller. */
+/** Usuario de una sesión válida, o null si ya no existe, fue desactivado, cambió de taller o de contraseña. */
 export async function sessionUser(session: SessionPayload) {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: { tenant: true },
   });
   if (!user || !user.active || user.tenantId !== session.tenantId) return null;
+  if ((session.v ?? 0) !== user.sessionVersion) return null;
   return user;
 }
 

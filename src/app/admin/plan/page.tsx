@@ -12,6 +12,8 @@ export default async function PlanPage() {
   if (!user) redirect("/admin/login");
   if (tenantAccess(user.tenant).state !== "expired") redirect("/admin");
   const salesUrl = salesContactUrl(user.tenant.name);
+  const wasPaid = Boolean(user.tenant.paidUntil);
+  const isAdmin = user.role === "ADMIN";
 
   return (
     <main className="flex-1 flex items-center justify-center px-5 py-16">
@@ -22,14 +24,21 @@ export default async function PlanPage() {
           </span>
           TallerLink
         </p>
-        <h1 className="text-2xl font-bold">Tu prueba terminó</h1>
+        <h1 className="text-2xl font-bold">{wasPaid ? "Tu plan venció" : "Tu prueba terminó"}</h1>
         <p className="mt-2 text-muted">
           Todo lo que registraste en <span className="font-medium text-ink">{user.tenant.name}</span> sigue guardado, y
-          tus clientes pueden seguir viendo sus carros. Activa tu plan para volver a usar el panel:{" "}
-          <span className="font-semibold text-ink">{PLAN_PRICE_LABEL}</span>, sin costo de instalación.
+          tus clientes pueden seguir viendo sus carros.{" "}
+          {isAdmin ? (
+            <>
+              {wasPaid ? "Renueva" : "Activa"} tu plan para volver a usar el panel:{" "}
+              <span className="font-semibold text-ink">{PLAN_PRICE_LABEL}</span>, sin costo de instalación.
+            </>
+          ) : (
+            "Pídele al administrador del taller que active el plan para volver a usar el panel."
+          )}
         </p>
 
-        {salesUrl ? (
+        {!isAdmin ? null : salesUrl ? (
           <a
             href={salesUrl}
             target="_blank"

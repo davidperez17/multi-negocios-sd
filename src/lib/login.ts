@@ -9,7 +9,7 @@ export const LOGIN_LOCK_MS = 15 * 60_000;
 const DUMMY_HASH = "$2b$10$xv85o8HQe9b2LhqEIN0No.lJ9YDrDyCibOH1i0KQdrsKspmhQuh6.";
 
 export type AuthResult =
-  | { ok: true; user: { id: string; tenantId: string } }
+  | { ok: true; user: { id: string; tenantId: string; sessionVersion: number } }
   | { ok: false; reason: "invalid" | "locked" };
 
 export async function authenticate(rawEmail: string, password: string): Promise<AuthResult> {
@@ -26,7 +26,7 @@ export async function authenticate(rawEmail: string, password: string): Promise<
     if (user.failedLogins > 0 || user.lockedUntil) {
       await prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
-    return { ok: true, user: { id: user.id, tenantId: user.tenantId } };
+    return { ok: true, user: { id: user.id, tenantId: user.tenantId, sessionVersion: user.sessionVersion } };
   }
 
   const { failedLogins } = await prisma.user.update({
