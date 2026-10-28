@@ -62,6 +62,31 @@ describe("createOrder: aislamiento por tenant", () => {
   });
 });
 
+describe("createOrder: vehículos sin duplicar", () => {
+  it("reutiliza el vehículo si el mismo cliente ya tiene esa placa", async () => {
+    const a = await makeTenantWithOrder();
+    await createOrder(a.tenant.id, {
+      customerId: a.customer.id,
+      vehicle: { ...newVehicle, plate: a.vehicle.plate },
+      concern: "Otra visita",
+      estimatedAt: null,
+    });
+    expect(await prisma.vehicle.count({ where: { tenantId: a.tenant.id } })).toBe(1);
+  });
+
+  it("la misma placa en otro tenant no se reutiliza", async () => {
+    const a = await makeTenantWithOrder();
+    const b = await makeTenantWithOrder();
+    await createOrder(b.tenant.id, {
+      customerId: b.customer.id,
+      vehicle: { ...newVehicle, plate: a.vehicle.plate },
+      concern: "x",
+      estimatedAt: null,
+    });
+    expect(await prisma.vehicle.count({ where: { plate: a.vehicle.plate } })).toBe(2);
+  });
+});
+
 describe("presupuesto aprobado se invalida al cambiar", () => {
   async function approved() {
     const ctx = await makeTenantWithOrder({ status: "IN_REPAIR" });

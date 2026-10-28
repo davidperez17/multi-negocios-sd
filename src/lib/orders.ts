@@ -64,7 +64,11 @@ async function createOrderTx(tx: Tx, tenantId: string, input: CreateOrderInput) 
     if (!VEHICLE_TYPES.includes(input.vehicle.type as (typeof VEHICLE_TYPES)[number])) {
       throw new DomainError("invalid_vehicle");
     }
-    const vehicle = await tx.vehicle.create({ data: { tenantId, customerId, ...input.vehicle } });
+    // Cliente que regresa con el mismo vehículo: se reutiliza en vez de duplicarlo
+    const existing = await tx.vehicle.findFirst({
+      where: { tenantId, customerId, plate: input.vehicle.plate },
+    });
+    const vehicle = existing ?? (await tx.vehicle.create({ data: { tenantId, customerId, ...input.vehicle } }));
     vehicleId = vehicle.id;
   } else {
     throw new DomainError("vehicle_required");

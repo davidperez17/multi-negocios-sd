@@ -16,6 +16,10 @@ function daysFromNow(d: number) {
 }
 
 async function main() {
+  // El seed borra todos los tenants: nunca contra una base de producción
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORCE !== "1") {
+    throw new Error("db:seed borra todos los datos. En producción requiere SEED_FORCE=1.");
+  }
   await prisma.tenant.deleteMany();
 
   const passwordHash = await bcrypt.hash("demo1234", 10);
