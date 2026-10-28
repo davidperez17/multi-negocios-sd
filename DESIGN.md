@@ -35,7 +35,7 @@ Mood: **bahía de servicio calibrada** — luz blanca de inspección, herramient
 }
 ```
 
-- Tenant puede sobreescribir `--primary` en su landing pública (branding propio); el admin de la plataforma mantiene el plum.
+- Tenant sobreescribe `--primary` (y hover/soft derivados) con su color de marca en su landing pública **y en su panel `/admin`** vía `tenantThemeVars()`. Las pantallas sin tenant (portada, login, registro) mantienen el plum de TallerLink. El color se guarda en OKLCH y se oscurece al guardar si el texto blanco encima no llega a 4.5:1.
 - Texto blanco sobre cualquier fill saturado de L 0.42–0.78 (botones, pills). Texto oscuro solo sobre fills pálidos (L > 0.85).
 
 ## Typography

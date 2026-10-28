@@ -5,6 +5,7 @@ import { PLAN_PRICE_LABEL, salesContactUrl, tenantAccess } from "@/lib/access";
 import { logout } from "../actions";
 import { NavLink } from "./NavLink";
 import { safeBrandColor } from "@/lib/validation";
+import { tenantThemeVars } from "@/lib/tenant";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -20,7 +21,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ];
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row min-h-dvh">
+    // El panel también lleva el color de marca del taller (botones, navegación activa, banner)
+    <div style={tenantThemeVars(user.tenant.brandColor)} className="flex-1 flex flex-col md:flex-row min-h-dvh">
       {/* Móvil: barra superior de marca. Desktop: sidebar fija */}
       <aside className="md:w-60 md:shrink-0 bg-surface-2 border-b md:border-b-0 md:border-r border-border">
         <div className="flex items-center justify-between md:flex-col md:items-stretch md:justify-start min-w-0 md:h-dvh md:sticky md:top-0">

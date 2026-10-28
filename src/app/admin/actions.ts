@@ -19,7 +19,7 @@ import { allowByIp } from "@/lib/rate-limit";
 import { addWorker, resetWorkerPassword, setWorkerActive, setWorkerRole } from "@/lib/team";
 import { VEHICLE_TYPES } from "@/lib/status";
 import {
-  isValidBrandColor,
+  parseBrandColor,
   normalizePlate,
   parseDateOnly,
   parseMoneyToCents,
@@ -260,9 +260,15 @@ export async function updateTenantSettings(formData: FormData) {
   }
   // Nombre y color nunca vacíos
   if (!data.name) delete data.name;
+  // El color va a atributos style: se guarda siempre como oklch(), nada de CSS extra
+  let colorAdjusted = false;
   if (!data.brandColor) delete data.brandColor;
-  // El color va a atributos style: solo oklch(), nada de CSS extra
-  else if (!isValidBrandColor(data.brandColor)) redirect("/admin/ajustes?error=color");
+  else {
+    const parsed = parseBrandColor(data.brandColor);
+    if (!parsed) redirect("/admin/ajustes?error=color");
+    data.brandColor = parsed.color;
+    colorAdjusted = parsed.adjusted;
+  }
 
   const types = formData
     .getAll("vehicleTypes")
@@ -273,7 +279,7 @@ export async function updateTenantSettings(formData: FormData) {
   await prisma.tenant.update({ where: { id: user.tenantId }, data });
   revalidatePath("/admin/ajustes");
   revalidatePath(`/t/${user.tenant.slug}`);
-  redirect("/admin/ajustes?saved=1");
+  redirect(`/admin/ajustes?saved=1${colorAdjusted ? "&ajustado=1" : ""}`);
 }
 
 // ── Equipo ────────────────────────────────────────────────────────

@@ -3,7 +3,8 @@ import { ExternalLink } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { VEHICLE_TYPE_LABELS, VEHICLE_TYPES } from "@/lib/status";
 import { updateTenantSettings } from "../../actions";
-import { safeBrandColor } from "@/lib/validation";
+import { oklchToHex, safeBrandColor } from "@/lib/validation";
+import { BrandColorPicker } from "./BrandColorPicker";
 
 export const metadata = { title: "Ajustes — TallerLink" };
 
@@ -14,11 +15,11 @@ const labelCls = "block text-sm font-medium mb-1.5";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; ajustado?: string }>;
 }) {
   const user = await requireUser();
   const t = user.tenant;
-  const { saved, error } = await searchParams;
+  const { saved, error, ajustado } = await searchParams;
   const isAdmin = user.role === "ADMIN";
   const activeTypes = new Set(t.vehicleTypes.split(","));
 
@@ -160,32 +161,12 @@ export default async function SettingsPage({
             </div>
           </div>
 
-          <div>
-            <label htmlFor="brandColor" className={labelCls}>
-              Color de marca (OKLCH)
-            </label>
-            <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className="h-11 w-11 shrink-0 rounded-(--radius-control) border border-border"
-                style={{ background: safeBrandColor(t.brandColor) }}
-              />
-              <input
-                id="brandColor"
-                name="brandColor"
-                defaultValue={t.brandColor}
-                placeholder="oklch(0.5 0.2 340)"
-                className={`${inputCls} font-mono text-sm`}
-              />
-            </div>
-            <p className="mt-1.5 text-xs text-muted">
-              Da identidad a tu landing y a la página de seguimiento de tus clientes.
-            </p>
-          </div>
+          <BrandColorPicker initialHex={oklchToHex(safeBrandColor(t.brandColor)) ?? "#a3207f"} />
 
           {saved && (
             <p role="status" className="text-sm font-medium text-status-ready">
               Cambios guardados. Tu landing ya muestra la información nueva.
+              {ajustado && " Oscurecimos un poco el color para que el texto blanco se lea bien."}
             </p>
           )}
           {error === "role" && (
@@ -195,7 +176,7 @@ export default async function SettingsPage({
           )}
           {error === "color" && (
             <p role="alert" className="text-sm text-danger">
-              El color debe tener formato OKLCH, por ejemplo oklch(0.5 0.16 250). No se guardaron los cambios.
+              No reconocimos ese color. Elige uno de la lista o con “Otro color”. No se guardaron los cambios.
             </p>
           )}
 
