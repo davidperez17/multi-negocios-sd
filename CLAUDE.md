@@ -29,5 +29,6 @@ SaaS multi-tenant para talleres de vehículos (carros, motos, camiones). MVP: ad
 - Dinero en centavos de quetzal (`unitCents`, Int). Formato es-GT / GTQ en `src/lib/format.ts`. Contexto: Guatemala (teléfonos +502, zonas, placas P-/C-/M-).
 
 ## Diseño
+- **Todo diseño/UI pasa por la skill `ui-ux-pro-max`** (búsqueda y checklist pre-entrega), sin contradecir `PRODUCT.md`/`DESIGN.md`.
 - Leer `PRODUCT.md` y `DESIGN.md` antes de tocar UI. Admin = registro product (denso, Restrained); landing pública = registro brand (Committed con color del tenant).
 - **Mobile-first obligatorio**: base sin prefijo = móvil (1 columna, stack vertical); `sm:`/`md:`/`lg:` agregan layout. Tablas siempre en contenedor `overflow-x-auto`. Nada de anchos fijos que desborden en 360px.
