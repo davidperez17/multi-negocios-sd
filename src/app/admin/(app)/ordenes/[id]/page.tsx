@@ -188,7 +188,7 @@ export default async function OrderDetail({
                   type="text"
                   inputMode="decimal"
                   required
-                  placeholder="Precio unit. Q"
+                  placeholder="Q 0.00"
                   aria-label="Precio unitario"
                   className={inputCls}
                 />

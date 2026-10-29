@@ -251,7 +251,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
               <p className="mt-4 flex items-start gap-2.5 rounded-(--radius-card) bg-status-ready/10 p-4 text-sm leading-relaxed">
                 <CircleCheck size={18} className="mt-0.5 shrink-0 text-status-ready" aria-hidden />
                 <span>
-                  Presupuesto <strong>aprobado</strong> el {formatDateTime(order.approvedAt)}.
+                  Presupuesto <strong>aprobado</strong> el {formatDateTime(order.approvedAt)}
                 </span>
               </p>
             )}
