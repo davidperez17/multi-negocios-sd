@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -17,8 +17,8 @@ export function sniffImageType(buf: Buffer): "jpg" | "png" | "webp" | null {
 }
 
 /** Guarda la foto de un avance. Devuelve la URL pública o null si no es una imagen válida. */
-export async function savePhoto(file: File, tenantId: string): Promise<string | null> {
-  if (file.size === 0 || file.size > PHOTO_MAX_BYTES) return null;
+export async function savePhoto(file: File, tenantId: string, maxBytes = PHOTO_MAX_BYTES): Promise<string | null> {
+  if (file.size === 0 || file.size > maxBytes) return null;
   const buf = Buffer.from(await file.arrayBuffer());
   const ext = sniffImageType(buf);
   if (!ext) return null;
@@ -27,4 +27,22 @@ export async function savePhoto(file: File, tenantId: string): Promise<string | 
   const name = `${randomUUID()}.${ext}`;
   await writeFile(path.join(dir, name), buf);
   return `/uploads/${tenantId}/${name}`;
+}
+
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+
+/** Logo (2 MB) o foto del local (5 MB) de la landing del taller. */
+export function saveTenantImage(file: File, tenantId: string, kind: "logo" | "storefront"): Promise<string | null> {
+  return savePhoto(file, tenantId, kind === "logo" ? LOGO_MAX_BYTES : PHOTO_MAX_BYTES);
+}
+
+/**
+ * Borra una imagen reemplazada. Solo acepta URLs con la forma exacta que genera savePhoto
+ * dentro de la carpeta del taller: cualquier otra cosa (otro taller, "..", URLs externas) se ignora.
+ */
+export async function deleteTenantUpload(url: string | null, tenantId: string): Promise<void> {
+  if (!url) return;
+  const m = url.match(/^\/uploads\/([^/]+)\/([0-9a-f-]+\.(?:jpg|png|webp))$/);
+  if (!m || m[1] !== tenantId) return;
+  await rm(path.join(process.cwd(), "public", "uploads", tenantId, m[2]), { force: true });
 }
