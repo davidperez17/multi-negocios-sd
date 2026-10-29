@@ -3,7 +3,8 @@ import { heroBackground, type LandingData } from "@/lib/landing";
 import { TrackingSearch } from "@/app/t/[slug]/TrackingSearch";
 
 // Landing pública del taller. Presentacional y sin DB: la usan la página /t/[slug]
-// y la vista previa en vivo de Ajustes (preview).
+// y la vista previa en vivo de Ajustes (preview). Medidas por contenedor (@container),
+// no por ventana: la vista previa es angosta dentro de una pantalla ancha.
 
 export function LandingView({ data, preview = false }: { data: LandingData; preview?: boolean }) {
   const { proof } = data;
@@ -15,7 +16,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
   const deliveredLabel = proof.delivered === 1 ? `${data.noun.one} ${entregad}` : `${data.noun.many} ${entregad}s`;
 
   return (
-    <div className="flex flex-1 flex-col bg-bg">
+    <div className="@container flex flex-1 flex-col bg-bg">
       <div className="text-white" style={heroBackground(data.heroStyle, data.brandColor)}>
         <header className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-4">
           <p className="flex min-w-0 items-center gap-3">
@@ -50,7 +51,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
           )}
         </header>
 
-        <section className="mx-auto max-w-5xl px-5 pt-4 pb-10 sm:pt-10 sm:pb-16 lg:grid lg:grid-cols-[1fr_minmax(0,26rem)] lg:items-center lg:gap-14">
+        <section className="mx-auto max-w-5xl px-5 pt-4 pb-10 @xl:pt-10 @xl:pb-16 @5xl:grid @5xl:grid-cols-[1fr_minmax(0,26rem)] @5xl:items-center @5xl:gap-14">
           <div>
             {data.status && (
               <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1.5 text-sm font-semibold ring-1 ring-white/30">
@@ -62,7 +63,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
               </p>
             )}
             <h1
-              className={`${enter} mt-4 text-balance text-[clamp(2.2rem,8vw,3.6rem)] font-extrabold leading-[1.05] tracking-tight`}
+              className={`${enter} mt-4 text-balance text-[clamp(2.2rem,9cqw,3.6rem)] font-extrabold leading-[1.05] tracking-tight`}
               style={{ "--i": 0 } as React.CSSProperties}
             >
               ¿Cómo va tu {data.noun.one}?
@@ -72,7 +73,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
             </p>
           </div>
 
-          <div className={`${enter} mt-7 lg:mt-0`} style={{ "--i": 1 } as React.CSSProperties}>
+          <div className={`${enter} mt-7 @5xl:mt-0`} style={{ "--i": 1 } as React.CSSProperties}>
             <div className="rounded-2xl bg-white p-5 text-ink shadow-xl shadow-black/15">
               <TrackingSearch slug={data.slug} noun={data.noun.one} whatsappHref={data.whatsappHref} preview={preview} />
             </div>
@@ -107,7 +108,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
 
       <div className="mx-auto w-full max-w-5xl px-5">
         {hasServices && (
-          <section className="border-b border-border py-10 sm:py-14">
+          <section className="border-b border-border py-10 @xl:py-14">
             <h2 className="text-2xl font-extrabold tracking-tight">Lo que hacemos</h2>
             {data.tagline && <p className="mt-2 text-lg font-medium">{data.tagline}</p>}
             {data.description && <p className="mt-2 max-w-2xl leading-relaxed text-muted">{data.description}</p>}
@@ -125,7 +126,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
         )}
 
         {hasVisit && (
-          <section className="py-10 sm:py-14 lg:grid lg:grid-cols-2 lg:gap-12">
+          <section className="py-10 @xl:py-14 @5xl:grid @5xl:grid-cols-2 @5xl:gap-12">
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Visítanos</h2>
               {data.storefrontPhotoUrl && (
@@ -170,7 +171,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
               )}
             </div>
 
-            <div className="mt-8 lg:mt-12">
+            <div className="mt-8 @5xl:mt-12">
               {(data.hoursRows.length > 0 || data.legacySchedule) && (
                 <div>
                   <h3 className="flex items-center gap-2 font-bold">

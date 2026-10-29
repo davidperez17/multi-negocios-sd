@@ -17,9 +17,8 @@ import { authenticate } from "@/lib/login";
 import { registerWorkshop } from "@/lib/signup";
 import { allowByIp } from "@/lib/rate-limit";
 import { addWorker, resetWorkerPassword, setWorkerActive, setWorkerRole } from "@/lib/team";
-import { VEHICLE_TYPES } from "@/lib/status";
+import { saveAppearance, saveContact, saveServices } from "@/lib/tenant-settings";
 import {
-  parseBrandColor,
   normalizePlate,
   parseDateOnly,
   parseMoneyToCents,
@@ -232,54 +231,73 @@ export async function createCustomer(formData: FormData) {
   redirect("/admin/clientes");
 }
 
-// ── Ajustes del tenant ────────────────────────────────────────────
+// ── Ajustes del tenant (una acción por pestaña) ───────────────────
 
-export async function updateTenantSettings(formData: FormData) {
+type SettingsTab = "pagina" | "contacto" | "servicios";
+
+async function settingsAction(tab: SettingsTab, fn: (tenantId: string) => Promise<string | void>) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/admin/ajustes?error=role");
-
-  const fields = [
-    "name",
-    "tagline",
-    "description",
-    "phone",
-    "whatsapp",
-    "email",
-    "address",
-    "city",
-    "schedule",
-    "services",
-    "brandColor",
-  ] as const;
-
-  const data: Record<string, string | null> = {};
-  for (const f of fields) {
-    // Tope de longitud: textos de landing, no documentos
-    const v = String(formData.get(f) ?? "").trim().slice(0, 2000);
-    data[f] = v || null;
+  if (user.role !== "ADMIN") redirect(`/admin/ajustes?tab=${tab}&error=role`);
+  let extra: string | void;
+  try {
+    extra = await fn(user.tenantId);
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ajustes?tab=${tab}&error=${e.code}`);
+    throw e;
   }
-  // Nombre y color nunca vacíos
-  if (!data.name) delete data.name;
-  // El color va a atributos style: se guarda siempre como oklch(), nada de CSS extra
-  let colorAdjusted = false;
-  if (!data.brandColor) delete data.brandColor;
-  else {
-    const parsed = parseBrandColor(data.brandColor);
-    if (!parsed) redirect("/admin/ajustes?error=color");
-    data.brandColor = parsed.color;
-    colorAdjusted = parsed.adjusted;
-  }
-
-  const types = formData
-    .getAll("vehicleTypes")
-    .map(String)
-    .filter((t) => (VEHICLE_TYPES as readonly string[]).includes(t));
-  if (types.length > 0) data.vehicleTypes = types.join(",");
-
-  await prisma.tenant.update({ where: { id: user.tenantId }, data });
-  revalidatePath("/admin/ajustes");
+  revalidatePath("/admin", "layout");
   revalidatePath(`/t/${user.tenant.slug}`);
-  redirect(`/admin/ajustes?saved=1${colorAdjusted ? "&ajustado=1" : ""}`);
+  redirect(`/admin/ajustes?tab=${tab}&saved=1${extra ?? ""}`);
+}
+
+const fileField = (formData: FormData, k: string) => {
+  const f = formData.get(k);
+  return f instanceof File && f.size > 0 ? f : null;
+};
+
+export async function saveAppearanceAction(formData: FormData) {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await settingsAction("pagina", async (tenantId) => {
+    const res = await saveAppearance(tenantId, {
+      name: field("name"),
+      tagline: field("tagline"),
+      brandColor: field("brandColor"),
+      heroStyle: field("heroStyle"),
+      foundedYear: field("foundedYear"),
+      showDeliveredCount: formData.get("showDeliveredCount") === "on",
+      useWeeklyHours: field("useWeeklyHours") === "1",
+      weeklyHours: field("weeklyHours"),
+      logo: fileField(formData, "logo"),
+      removeLogo: field("removeLogo") === "1",
+      storefront: fileField(formData, "storefront"),
+      removeStorefront: field("removeStorefront") === "1",
+    });
+    return res.colorAdjusted ? "&ajustado=1" : undefined;
+  });
+}
+
+export async function saveContactAction(formData: FormData) {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await settingsAction("contacto", (tenantId) =>
+    saveContact(tenantId, {
+      whatsapp: field("whatsapp"),
+      phone: field("phone"),
+      email: field("email"),
+      address: field("address"),
+      city: field("city"),
+      mapsUrl: field("mapsUrl"),
+    })
+  );
+}
+
+export async function saveServicesAction(formData: FormData) {
+  await settingsAction("servicios", (tenantId) =>
+    saveServices(tenantId, {
+      services: formData.getAll("services").map(String),
+      vehicleTypes: formData.getAll("vehicleTypes").map(String),
+      description: String(formData.get("description") ?? ""),
+    })
+  );
 }
 
 // ── Equipo ────────────────────────────────────────────────────────

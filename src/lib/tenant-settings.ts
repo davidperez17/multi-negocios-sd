@@ -5,13 +5,12 @@ import { isHeroStyle } from "./landing";
 import { deleteTenantUpload, saveTenantImage } from "./uploads";
 import { VEHICLE_TYPES } from "./status";
 import { isValidEmail, normalizeGtPhone, parseBrandColor, waNumber } from "./validation";
+import { MAX_SERVICES, SERVICE_MAX_LENGTH } from "./tenant-settings-limits";
 
 // Ajustes del taller, una función por pestaña: cada una escribe solo sus campos,
 // así guardar una pestaña nunca pisa lo de otra. El tenantId viene de la sesión; el rol lo valida el action.
 
 const TEXT_MAX = 2000;
-export const MAX_SERVICES = 20;
-export const SERVICE_MAX_LENGTH = 60;
 const MAPS_HOSTS = new Set(["maps.app.goo.gl", "goo.gl", "www.google.com", "google.com", "maps.google.com"]);
 
 const text = (v: string) => v.trim().slice(0, TEXT_MAX) || null;

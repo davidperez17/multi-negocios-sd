@@ -5,8 +5,18 @@ import { Check } from "lucide-react";
 import { BRAND_PRESETS } from "@/lib/validation";
 
 // Selector de color de marca: sugeridos + personalizado. Envía hex; el servidor lo guarda en OKLCH.
-export function BrandColorPicker({ initialHex }: { initialHex: string }) {
-  const [hex, setHex] = useState(initialHex);
+export function BrandColorPicker({
+  initialHex,
+  onChange,
+}: {
+  initialHex: string;
+  onChange?: (hex: string) => void;
+}) {
+  const [hex, setHexState] = useState(initialHex);
+  const setHex = (next: string) => {
+    setHexState(next);
+    onChange?.(next);
+  };
   const pickerRef = useRef<HTMLInputElement>(null);
   const isPreset = BRAND_PRESETS.some((p) => p.hex === hex);
 
@@ -82,10 +92,10 @@ export function BrandColorPicker({ initialHex }: { initialHex: string }) {
         >
           Consultar mi vehículo
         </span>
-        <span className="text-xs text-muted">Así se ven los botones de tu landing.</span>
+        <span className="text-xs text-muted">Así se ven los botones de tu página.</span>
       </div>
       <p className="mt-1.5 text-xs text-muted">
-        Da identidad a tu landing y a la página de seguimiento de tus clientes. Si eliges un color muy claro, lo
+        Da identidad a tu página y al seguimiento de tus clientes. Si eliges un color muy claro, lo
         oscurecemos un poco para que el texto se lea.
       </p>
     </fieldset>
