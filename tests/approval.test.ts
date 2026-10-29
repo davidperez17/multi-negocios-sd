@@ -25,6 +25,19 @@ describe("approveBudget", () => {
     expect(after.approvedTotalCents).toBe(15000);
   });
 
+  it("al aprobar, la orden pasa sola a En reparación con su avance", async () => {
+    const { tenant, order } = await withItems([10000]);
+    await approveBudget({ slug: tenant.slug, code: order.trackingCode, pin: "12345", totalCents: 10000 });
+    const after = await prisma.workOrder.findUniqueOrThrow({ where: { id: order.id } });
+    expect(after.status).toBe("IN_REPAIR");
+    const last = await prisma.progressUpdate.findFirstOrThrow({
+      where: { workOrderId: order.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(last.status).toBe("IN_REPAIR");
+    expect(last.message).toMatch(/aprobado/i);
+  });
+
   it("rechaza si el total que vio el cliente ya no coincide", async () => {
     const { tenant, order } = await withItems([10000]);
     const res = await approveBudget({ slug: tenant.slug, code: order.trackingCode, pin: "12345", totalCents: 5000 });

@@ -41,15 +41,15 @@ export async function approveBudget(args: {
     // Condicional: un doble clic concurrente solo aprueba una vez
     const { count } = await tx.workOrder.updateMany({
       where: { id: order.id, approvedAt: null, status: "WAITING_APPROVAL" },
-      data: { approvedAt, approvedTotalCents: total },
+      // Aprobado = el taller puede seguir: la orden pasa sola a reparación
+      data: { approvedAt, approvedTotalCents: total, status: "IN_REPAIR" },
     });
     if (count === 0) return false;
     await tx.progressUpdate.create({
       data: {
         workOrderId: order.id,
-        message:
-          "Presupuesto aprobado por el cliente desde la página de seguimiento. El taller continuará con la reparación.",
-        status: "WAITING_APPROVAL",
+        message: "Presupuesto aprobado por el cliente. Tu vehículo pasa a reparación.",
+        status: "IN_REPAIR",
       },
     });
     return true;
