@@ -20,7 +20,7 @@ export function isHeroStyle(s: string): s is HeroStyle {
   return (HERO_STYLES as readonly string[]).includes(s);
 }
 
-/** Fondo del encabezado. Patrones blancos de baja opacidad: nunca aclaran el color base. */
+/** Fondo del encabezado. Nunca más claro que el color de marca; los patrones son trazos finos de baja opacidad. */
 export function heroBackground(style: string, brandColor: string): CSSProperties {
   const c = safeBrandColor(brandColor);
   switch (isHeroStyle(style) ? style : "GRADIENT") {
@@ -29,30 +29,33 @@ export function heroBackground(style: string, brandColor: string): CSSProperties
     case "DOTS":
       return {
         backgroundColor: c,
-        backgroundImage: "radial-gradient(rgb(255 255 255 / 0.16) 1.4px, transparent 1.6px)",
+        backgroundImage: "radial-gradient(rgb(255 255 255 / 0.12) 1.4px, transparent 1.6px)",
         backgroundSize: "18px 18px",
       };
     case "LINES":
       return {
         backgroundColor: c,
-        backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.09) 0 2px, transparent 2px 14px)",
+        backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 14px)",
       };
     default:
       return {
         backgroundColor: c,
-        backgroundImage: `linear-gradient(160deg, color-mix(in oklch, ${c} 82%, white) 0%, ${c} 45%, color-mix(in oklch, ${c} 70%, black) 100%)`,
+        // Solo hacia oscuro: el color de marca ya garantiza 4.5:1 con texto blanco
+        backgroundImage: `linear-gradient(160deg, ${c} 0%, ${c} 35%, color-mix(in oklch, ${c} 68%, black) 100%)`,
       };
   }
 }
 
-const NOUNS: Record<VehicleType, { one: string; many: string }> = {
-  CAR: { one: "carro", many: "carros" },
-  MOTORCYCLE: { one: "moto", many: "motos" },
-  TRUCK: { one: "camión", many: "camiones" },
+export type VehicleNoun = { one: string; many: string; feminine: boolean };
+
+const NOUNS: Record<VehicleType, VehicleNoun> = {
+  CAR: { one: "carro", many: "carros", feminine: false },
+  MOTORCYCLE: { one: "moto", many: "motos", feminine: true },
+  TRUCK: { one: "camión", many: "camiones", feminine: false },
 };
 
 /** "carro" salvo talleres de un solo tipo de vehículo (solo motos → "moto"). */
-export function vehicleNoun(types: string[]): { one: string; many: string } {
+export function vehicleNoun(types: string[]): VehicleNoun {
   const valid = [...new Set(types)].filter((t): t is VehicleType => (VEHICLE_TYPES as readonly string[]).includes(t));
   return valid.length === 1 ? NOUNS[valid[0]] : NOUNS.CAR;
 }
@@ -87,7 +90,7 @@ export type LandingData = {
   storefrontPhotoUrl: string | null;
   heroStyle: HeroStyle;
   brandColor: string;
-  noun: { one: string; many: string };
+  noun: VehicleNoun;
   tagline: string | null;
   description: string | null;
   services: string[];

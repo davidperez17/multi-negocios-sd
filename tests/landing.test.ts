@@ -54,10 +54,10 @@ describe("extractTrackingCode", () => {
 
 describe("vehicleNoun", () => {
   it.each([
-    [["MOTORCYCLE"], { one: "moto", many: "motos" }],
-    [["TRUCK"], { one: "camión", many: "camiones" }],
-    [["CAR", "TRUCK"], { one: "carro", many: "carros" }],
-    [[], { one: "carro", many: "carros" }],
+    [["MOTORCYCLE"], { one: "moto", many: "motos", feminine: true }],
+    [["TRUCK"], { one: "camión", many: "camiones", feminine: false }],
+    [["CAR", "TRUCK"], { one: "carro", many: "carros", feminine: false }],
+    [[], { one: "carro", many: "carros", feminine: false }],
   ])("%j", (types, noun) => {
     expect(vehicleNoun(types)).toEqual(noun);
   });
@@ -69,6 +69,12 @@ describe("heroBackground", () => {
     expect(css).not.toContain("position");
     expect(css).not.toContain("red;");
     expect(css).toContain(DEFAULT_BRAND_COLOR);
+  });
+
+  it("ningún estilo aclara el color de marca (el texto blanco ya cumple 4.5:1 sobre él)", () => {
+    for (const style of ["SOLID", "GRADIENT", "DOTS", "LINES"]) {
+      expect(JSON.stringify(heroBackground(style, DEFAULT_BRAND_COLOR))).not.toContain("white");
+    }
   });
 
   it("los 4 estilos dan fondos distintos", () => {
