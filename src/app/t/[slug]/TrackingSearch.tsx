@@ -104,7 +104,7 @@ export function TrackingSearch({
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-primary underline underline-offset-4"
+              className="-my-3 inline-block py-3 font-semibold text-primary underline underline-offset-4"
             >
               Pídelo por WhatsApp
             </a>
