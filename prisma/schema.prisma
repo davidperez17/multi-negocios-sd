@@ -26,6 +26,16 @@ model Tenant {
   // Servicios ofrecidos, separados por saltos de línea (MVP)
   services     String?
   schedule     String?
+  // Landing personalizable: foto del local (opcional, junto a la dirección)
+  storefrontPhotoUrl String?
+  // Fondo del encabezado: SOLID | GRADIENT | DOTS | LINES (siempre con el color de marca)
+  heroStyle    String   @default("GRADIENT")
+  foundedYear  Int?
+  showDeliveredCount Boolean @default(true)
+  // Link propio de Google Maps (opcional); si no, se busca por dirección
+  mapsUrl      String?
+  // Horario por día en JSON (src/lib/hours.ts). null = sin horario por día (se usa `schedule`)
+  weeklyHours  String?
   // Prueba gratis (registro propio). null = taller creado a mano, sin prueba
   trialEndsAt  DateTime?
   // Plan pagado vigente hasta esta fecha; se extiende con `pnpm tenant:activate`
