@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
+import { LOGO_MAX_BYTES, PHOTO_MAX_BYTES } from "@/lib/tenant-settings-limits";
 
 // Logo o foto del local: vista previa local, "Quitar" y aviso al padre para la vista previa de la landing.
 export function ImageField({
@@ -24,6 +25,8 @@ export function ImageField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(currentUrl);
   const [removed, setRemoved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const maxBytes = name === "logo" ? LOGO_MAX_BYTES : PHOTO_MAX_BYTES;
   const objectUrl = useRef<string | null>(null);
 
   useEffect(() => () => {
@@ -38,6 +41,13 @@ export function ImageField({
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Avisar antes de subir: si no, el error llega tras enviar todo y se pierden los demás cambios
+    if (file.size > maxBytes) {
+      e.target.value = "";
+      setError(`Esa imagen pesa ${(file.size / 1024 / 1024).toFixed(1)} MB. El máximo es ${maxBytes / 1024 / 1024} MB.`);
+      return;
+    }
+    setError(null);
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = URL.createObjectURL(file);
     setRemoved(false);
@@ -90,7 +100,6 @@ export function ImageField({
               name={name}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              capture={camera ? "environment" : undefined}
               onChange={onFile}
               className="sr-only"
             />
@@ -107,6 +116,11 @@ export function ImageField({
           )}
         </div>
       </div>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
       <input type="hidden" name={name === "logo" ? "removeLogo" : "removeStorefront"} value={removed ? "1" : "0"} />
     </div>
   );

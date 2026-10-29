@@ -1,5 +1,5 @@
 import { Clock, MapPin, MessageCircle, Navigation, Phone } from "lucide-react";
-import { heroBackground, type LandingData } from "@/lib/landing";
+import { heroBackground, heroOverlay, type LandingData } from "@/lib/landing";
 import { TrackingSearch } from "@/app/t/[slug]/TrackingSearch";
 
 // Landing pública del taller. Presentacional y sin DB: la usan la página /t/[slug]
@@ -54,7 +54,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
         <section className="mx-auto max-w-5xl px-5 pt-4 pb-10 @xl:pt-10 @xl:pb-16 @5xl:grid @5xl:grid-cols-[1fr_minmax(0,26rem)] @5xl:items-center @5xl:gap-14">
           <div>
             {data.status && (
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1.5 text-sm font-semibold ring-1 ring-white/30">
+              <p className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold" style={heroOverlay}>
                 <span
                   aria-hidden
                   className={`h-2 w-2 rounded-full ${data.status.open ? "bg-[oklch(0.82_0.17_150)]" : "bg-white/70"}`}
@@ -68,7 +68,7 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
             >
               ¿Cómo va tu {data.noun.one}?
             </h1>
-            <p className="mt-3 max-w-md text-lg leading-relaxed text-white/90">
+            <p className="mt-3 max-w-md text-lg leading-relaxed text-white">
               Pon el código que te dimos al recibirlo y mira avances, fotos y costos.
             </p>
           </div>
@@ -81,22 +81,22 @@ export function LandingView({ data, preview = false }: { data: LandingData; prev
             {hasProof && (
               <dl className="mt-4 grid grid-cols-2 gap-3">
                 {proof.delivered !== null && (
-                  <div className="rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/25">
+                  <div className="rounded-xl px-4 py-3" style={heroOverlay}>
                     <dt className="sr-only">{deliveredLabel}</dt>
                     <dd>
                       <span className="block text-2xl font-extrabold [font-variant-numeric:tabular-nums]">
                         {proof.delivered.toLocaleString("es-GT")}
                       </span>
-                      <span className="text-sm text-white/90">{deliveredLabel}</span>
+                      <span className="text-sm text-white">{deliveredLabel}</span>
                     </dd>
                   </div>
                 )}
                 {proof.since !== null && (
-                  <div className="rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/25">
+                  <div className="rounded-xl px-4 py-3" style={heroOverlay}>
                     <dt className="sr-only">Año de apertura</dt>
                     <dd>
                       <span className="block text-2xl font-extrabold">Desde {proof.since}</span>
-                      {proof.place && <span className="text-sm text-white/90">en {proof.place}</span>}
+                      {proof.place && <span className="text-sm text-white">en {proof.place}</span>}
                     </dd>
                   </div>
                 )}

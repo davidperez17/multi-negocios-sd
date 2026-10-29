@@ -39,6 +39,7 @@ export function AppearanceForm({
   const [showDelivered, setShowDelivered] = useState(tenant.showDeliveredCount);
   const [hoursOn, setHoursOn] = useState(savedHours !== null);
   const [hours, setHours] = useState<WeeklyHours>(savedHours ?? DEFAULT_WEEKLY_HOURS);
+  const [schedule, setSchedule] = useState(tenant.schedule ?? "");
   const [logoUrl, setLogoUrl] = useState(tenant.logoUrl);
   const [photoUrl, setPhotoUrl] = useState(tenant.storefrontPhotoUrl);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -70,6 +71,7 @@ export function AppearanceForm({
           foundedYear: year,
           showDeliveredCount: showDelivered,
           weeklyHours: hoursOn ? JSON.stringify(hours) : null,
+          schedule: schedule.trim() || null,
           logoUrl,
           storefrontPhotoUrl: photoUrl,
         },
@@ -208,7 +210,10 @@ export function AppearanceForm({
             onEnabledChange={setHoursOn}
             onHoursChange={setHours}
             defaults={DEFAULT_WEEKLY_HOURS}
+            legacyText={schedule}
+            onLegacyTextChange={setSchedule}
           />
+          <input type="hidden" name="schedule" value={schedule} />
           <input type="hidden" name="useWeeklyHours" value={hoursOn ? "1" : "0"} />
           <input type="hidden" name="weeklyHours" value={JSON.stringify(hours)} />
 

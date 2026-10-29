@@ -43,6 +43,12 @@ describe("extractTrackingCode", () => {
     [" ABC 123 ", "TX-ABC123"],
     ["Mira tu carro: http://x/t/taller/seguimiento/TX-ABC123 gracias", "TX-ABC123"],
     ["TX-DEMO01", "TX-DEMO01"],
+    // Códigos válidos que empiezan con TX (T y X están en el alfabeto)
+    ["TXA234", "TX-TXA234"],
+    ["txk9m2", "TX-TXK9M2"],
+    ["TX-TXA234", "TX-TXA234"],
+    // Slug con "tx-" en el link: gana el código después de /seguimiento/
+    ["http://x/t/tx-motors/seguimiento/TX-ABC234", "TX-ABC234"],
   ])("%j → %s", (raw, code) => {
     expect(extractTrackingCode(raw)).toBe(code);
   });
@@ -71,9 +77,24 @@ describe("heroBackground", () => {
     expect(css).toContain(DEFAULT_BRAND_COLOR);
   });
 
-  it("ningún estilo aclara el color de marca (el texto blanco ya cumple 4.5:1 sobre él)", () => {
+  it("ningún estilo aclara el color de marca (ni degradado ni patrones blancos)", () => {
     for (const style of ["SOLID", "GRADIENT", "DOTS", "LINES"]) {
-      expect(JSON.stringify(heroBackground(style, DEFAULT_BRAND_COLOR))).not.toContain("white");
+      const css = JSON.stringify(heroBackground(style, DEFAULT_BRAND_COLOR));
+      expect(css).not.toContain("white");
+      expect(css).not.toMatch(/255 255 255|255, ?255, ?255/);
+    }
+  });
+
+  it("chip y recuadros del encabezado solo oscurecen: el texto blanco queda ≥ 4.5:1 en los 8 colores", async () => {
+    const { BRAND_PRESETS, parseBrandColor, oklchToHex } = await import("@/lib/validation");
+    const { HERO_OVERLAY_BLACK_ALPHA } = await import("@/lib/landing");
+    const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    for (const p of BRAND_PRESETS) {
+      const hex = oklchToHex(parseBrandColor(p.hex)!.color)!;
+      // Composición sRGB del overlay negro sobre el color de marca
+      const rgb = [1, 3, 5].map((i) => (parseInt(hex.slice(i, i + 2), 16) / 255) * (1 - HERO_OVERLAY_BLACK_ALPHA));
+      const L = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+      expect(1.05 / (L + 0.05), p.label).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -160,5 +181,15 @@ describe("buildLandingData", () => {
 
   it("estilo de fondo desconocido cae al degradado", () => {
     expect(buildLandingData(tenant({ heroStyle: "NEON" }), 0, NOW).heroStyle).toBe("GRADIENT");
+  });
+});
+
+describe("siteUrl (metadataBase para la vista previa de WhatsApp)", () => {
+  it("usa PUBLIC_URL si es una URL https válida", async () => {
+    const { siteUrl } = await import("@/lib/site");
+    expect(siteUrl({ PUBLIC_URL: "https://micomercio.app" })?.href).toBe("https://micomercio.app/");
+    expect(siteUrl({ PUBLIC_URL: "" })).toBeUndefined();
+    expect(siteUrl({ PUBLIC_URL: "no es url" })).toBeUndefined();
+    expect(siteUrl({})).toBeUndefined();
   });
 });

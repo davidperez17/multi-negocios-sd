@@ -43,6 +43,7 @@ const appearance = (over: Partial<Parameters<typeof saveAppearance>[1]> = {}) =>
   brandColor: "#1e6fd9",
   heroStyle: "DOTS",
   foundedYear: "1998",
+  schedule: "",
   showDeliveredCount: true,
   useWeeklyHours: false,
   weeklyHours: split,
@@ -62,6 +63,14 @@ describe("saveAppearance", () => {
     expect(after.heroStyle).toBe("DOTS");
     expect(after.foundedYear).toBe(1998);
     expect(after.name).toBe("Taller Prueba");
+  });
+
+  it("con el horario por día apagado se edita y se puede borrar el horario en texto", async () => {
+    const t = await tenant();
+    await saveAppearance(t.id, appearance({ schedule: " Lun-Sáb 8-17 · emergencias 24h " }));
+    expect((await prisma.tenant.findUniqueOrThrow({ where: { id: t.id } })).schedule).toBe("Lun-Sáb 8-17 · emergencias 24h");
+    await saveAppearance(t.id, appearance({ schedule: "" }));
+    expect((await prisma.tenant.findUniqueOrThrow({ where: { id: t.id } })).schedule).toBeNull();
   });
 
   it("con el horario encendido guarda dos tramos tal cual", async () => {

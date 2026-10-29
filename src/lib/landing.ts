@@ -20,7 +20,11 @@ export function isHeroStyle(s: string): s is HeroStyle {
   return (HERO_STYLES as readonly string[]).includes(s);
 }
 
-/** Fondo del encabezado. Nunca más claro que el color de marca; los patrones son trazos finos de baja opacidad. */
+/** Opacidad del negro bajo chip y recuadros del encabezado: solo oscurece, el texto blanco sigue ≥ 4.5:1. */
+export const HERO_OVERLAY_BLACK_ALPHA = 0.18;
+export const heroOverlay: CSSProperties = { backgroundColor: `rgb(0 0 0 / ${HERO_OVERLAY_BLACK_ALPHA})` };
+
+/** Fondo del encabezado. Nunca más claro que el color de marca: degradado y patrones solo oscurecen. */
 export function heroBackground(style: string, brandColor: string): CSSProperties {
   const c = safeBrandColor(brandColor);
   switch (isHeroStyle(style) ? style : "GRADIENT") {
@@ -29,13 +33,13 @@ export function heroBackground(style: string, brandColor: string): CSSProperties
     case "DOTS":
       return {
         backgroundColor: c,
-        backgroundImage: "radial-gradient(rgb(255 255 255 / 0.12) 1.4px, transparent 1.6px)",
+        backgroundImage: "radial-gradient(rgb(0 0 0 / 0.16) 1.4px, transparent 1.6px)",
         backgroundSize: "18px 18px",
       };
     case "LINES":
       return {
         backgroundColor: c,
-        backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 14px)",
+        backgroundImage: "repeating-linear-gradient(135deg, rgb(0 0 0 / 0.1) 0 2px, transparent 2px 14px)",
       };
     default:
       return {
@@ -63,10 +67,16 @@ export function vehicleNoun(types: string[]): VehicleNoun {
 /** Código TX-XXXXXX desde lo que el cliente escriba o pegue (link o mensaje completo). */
 export function extractTrackingCode(input: string): string | null {
   const s = input.toUpperCase();
-  const inText = s.match(/(?:^|[^A-Z0-9])TX-([A-Z0-9]{6})(?![A-Z0-9])/);
-  if (inText) return `TX-${inText[1]}`;
-  const compact = s.replace(/\s+/g, "").replace(/^TX-?/, "");
-  return /^[A-Z0-9]{6}$/.test(compact) ? `TX-${compact}` : null;
+  // Link de seguimiento: el código es lo que sigue a /seguimiento/ (el slug también puede tener "tx-")
+  const fromLink = s.match(/SEGUIMIENTO\/TX-([A-Z0-9]{6})(?![A-Z0-9])/);
+  if (fromLink) return `TX-${fromLink[1]}`;
+  const compact = s.replace(/\s+/g, "");
+  // 6 caracteres tal cual: el campo ya muestra "TX-" (y hay códigos que empiezan con TX)
+  if (/^[A-Z0-9]{6}$/.test(compact)) return `TX-${compact}`;
+  const withPrefix = compact.match(/^TX-?([A-Z0-9]{6})$/);
+  if (withPrefix) return `TX-${withPrefix[1]}`;
+  const inText = [...s.matchAll(/(?:^|[^A-Z0-9])TX-([A-Z0-9]{6})(?![A-Z0-9])/g)].at(-1);
+  return inText ? `TX-${inText[1]}` : null;
 }
 
 export function mapsLinks(t: {

@@ -267,6 +267,7 @@ export async function saveAppearanceAction(formData: FormData) {
       showDeliveredCount: formData.get("showDeliveredCount") === "on",
       useWeeklyHours: field("useWeeklyHours") === "1",
       weeklyHours: field("weeklyHours"),
+      schedule: field("schedule"),
       logo: fileField(formData, "logo"),
       removeLogo: field("removeLogo") === "1",
       storefront: fileField(formData, "storefront"),

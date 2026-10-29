@@ -2,7 +2,9 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-export const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+import { LOGO_MAX_BYTES, PHOTO_MAX_BYTES } from "./tenant-settings-limits";
+
+export { LOGO_MAX_BYTES, PHOTO_MAX_BYTES };
 
 /**
  * Tipo real de la imagen por sus primeros bytes. El MIME del form lo controla el cliente,
@@ -28,8 +30,6 @@ export async function savePhoto(file: File, tenantId: string, maxBytes = PHOTO_M
   await writeFile(path.join(dir, name), buf);
   return `/uploads/${tenantId}/${name}`;
 }
-
-export const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 /** Logo (2 MB) o foto del local (5 MB) de la landing del taller. */
 export function saveTenantImage(file: File, tenantId: string, kind: "logo" | "storefront"): Promise<string | null> {

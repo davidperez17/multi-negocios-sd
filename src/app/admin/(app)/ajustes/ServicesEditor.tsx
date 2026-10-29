@@ -48,6 +48,8 @@ export function ServicesEditor({ initial }: { initial: string[] }) {
           Agregar
         </button>
       </div>
+      {/* Lo escrito sin tocar "Agregar" también se guarda (el servidor descarta duplicados) */}
+      {draft.trim() && !full && <input type="hidden" name="services" value={draft.trim()} />}
       {services.length > 0 ? (
         <ul className="mt-3 flex flex-wrap gap-2">
           {services.map((s) => (

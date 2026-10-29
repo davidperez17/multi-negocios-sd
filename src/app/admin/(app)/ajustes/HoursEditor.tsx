@@ -37,7 +37,11 @@ export function HoursEditor({
   onEnabledChange,
   onHoursChange,
   defaults,
+  legacyText,
+  onLegacyTextChange,
 }: {
+  legacyText: string;
+  onLegacyTextChange: (v: string) => void;
   enabled: boolean;
   hours: WeeklyHours;
   onEnabledChange: (v: boolean) => void;
@@ -162,9 +166,22 @@ export function HoursEditor({
           )}
         </>
       ) : (
-        <p className="mt-3 text-sm text-muted">
-          Apagado: tu página no muestra si estás abierto. Enciéndelo para configurar tu horario de cada día.
-        </p>
+        <div className="mt-4">
+          <label htmlFor="schedule" className="block text-sm font-medium mb-1.5">
+            Horario en texto (opcional)
+          </label>
+          <input
+            id="schedule"
+            maxLength={200}
+            value={legacyText}
+            onChange={(e) => onLegacyTextChange(e.target.value)}
+            placeholder="Lun–Vie 8:00–18:00 · Sáb 8:00–13:00"
+            className="w-full h-11 rounded-(--radius-control) border border-border bg-bg px-3.5 placeholder:text-muted"
+          />
+          <p className="mt-1.5 text-sm text-muted">
+            Se muestra tal cual en tu página. Enciende &quot;Usar horario por día&quot; para que tu página diga si estás abierto ahora.
+          </p>
+        </div>
       )}
     </fieldset>
   );

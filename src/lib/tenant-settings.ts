@@ -24,6 +24,8 @@ export type AppearanceInput = {
   showDeliveredCount: boolean;
   useWeeklyHours: boolean;
   weeklyHours: string;
+  /** Horario en texto libre: se muestra en la página solo mientras no hay horario por día */
+  schedule: string;
   logo?: File | null;
   removeLogo: boolean;
   storefront?: File | null;
@@ -96,6 +98,7 @@ export async function saveAppearance(
         foundedYear,
         showDeliveredCount: input.showDeliveredCount,
         weeklyHours,
+        schedule: text(input.schedule),
         logoUrl,
         storefrontPhotoUrl,
       },
