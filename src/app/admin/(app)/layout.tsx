@@ -1,30 +1,35 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { Wrench, LayoutDashboard, ClipboardList, Users, Settings, LogOut, ExternalLink } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { Wrench, LayoutDashboard, ClipboardList, Users, UserCog, Settings, LogOut, ExternalLink } from "lucide-react";
+import { requireUser } from "@/lib/auth";
+import { PLAN_PRICE_LABEL, salesContactUrl, tenantAccess } from "@/lib/access";
 import { logout } from "../actions";
 import { NavLink } from "./NavLink";
+import { safeBrandColor } from "@/lib/validation";
+import { tenantThemeVars } from "@/lib/tenant";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
+  const user = await requireUser();
+  const access = tenantAccess(user.tenant);
+  const salesUrl = salesContactUrl(user.tenant.name);
 
   const nav = [
     { href: "/admin", label: "Tablero", icon: LayoutDashboard, exact: true },
     { href: "/admin/ordenes", label: "Órdenes", icon: ClipboardList, exact: false },
     { href: "/admin/clientes", label: "Clientes", icon: Users, exact: false },
+    { href: "/admin/equipo", label: "Equipo", icon: UserCog, exact: false },
     { href: "/admin/ajustes", label: "Ajustes", icon: Settings, exact: false },
   ];
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row min-h-dvh">
+    // El panel también lleva el color de marca del taller (botones, navegación activa, banner)
+    <div style={tenantThemeVars(user.tenant.brandColor)} className="flex-1 flex flex-col md:flex-row min-h-dvh">
       {/* Móvil: barra superior de marca. Desktop: sidebar fija */}
       <aside className="md:w-60 md:shrink-0 bg-surface-2 border-b md:border-b-0 md:border-r border-border">
         <div className="flex items-center justify-between md:flex-col md:items-stretch md:justify-start min-w-0 md:h-dvh md:sticky md:top-0">
           <div className="px-4 py-3 md:py-5 flex items-center gap-2.5 min-w-0">
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-              style={{ background: user.tenant.brandColor }}
+              style={{ background: safeBrandColor(user.tenant.brandColor) }}
             >
               <Wrench size={15} aria-hidden />
             </span>
@@ -78,13 +83,34 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
       {/* pb en móvil reserva espacio para la barra inferior fija */}
       <main className="flex-1 min-w-0 pb-24 md:pb-0">
+        {access.state === "trial" && (
+          <div className="border-b border-border bg-primary-soft px-5 py-2.5 text-sm">
+            <p className="mx-auto max-w-5xl">
+              <span className="font-semibold">
+                Prueba gratis: te queda{access.daysLeft === 1 ? "" : "n"} {access.daysLeft} día
+                {access.daysLeft === 1 ? "" : "s"}.
+              </span>{" "}
+              Después, {PLAN_PRICE_LABEL}.{" "}
+              {salesUrl && (
+                <a
+                  href={salesUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline underline-offset-4"
+                >
+                  Activar mi plan
+                </a>
+              )}
+            </p>
+          </div>
+        )}
         <div className="mx-auto max-w-5xl px-5 py-6 md:py-8">{children}</div>
       </main>
 
       {/* Móvil: barra de navegación inferior fija (DESIGN.md) */}
       <nav
         aria-label="Navegación principal"
-        className="fixed bottom-0 inset-x-0 z-20 md:hidden grid grid-cols-4 bg-surface-2 border-t border-border pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-20 md:hidden grid grid-cols-5 bg-surface-2 border-t border-border pb-[env(safe-area-inset-bottom)]"
       >
         {nav.map((item) => (
           <NavLink key={item.href} href={item.href} exact={item.exact} label={item.label} variant="bottom">

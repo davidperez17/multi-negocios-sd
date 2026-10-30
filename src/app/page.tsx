@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Wrench, LayoutDashboard } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { VEHICLE_TYPE_PLURALS, type VehicleType } from "@/lib/status";
+import { safeBrandColor } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,21 @@ export default async function Home() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
-            href="/admin"
+            href="/registro"
             className="inline-flex h-12 items-center gap-2 rounded-(--radius-control) bg-primary px-6 font-semibold text-white hover:bg-primary-hover transition-colors duration-150"
           >
+            Prueba gratis 30 días
+            <ArrowRight size={18} aria-hidden />
+          </Link>
+          <Link
+            href="/admin"
+            className="inline-flex h-12 items-center gap-2 rounded-(--radius-control) border border-border px-6 font-semibold hover:border-primary hover:text-primary transition-colors duration-150"
+          >
             <LayoutDashboard size={18} aria-hidden />
-            Entrar al panel del taller
+            Entrar al panel
           </Link>
         </div>
+        <p className="mt-3 text-sm text-muted">Sin tarjeta. Después, Q199/mes + IVA, sin costo de instalación.</p>
       </section>
 
       <section className="mx-auto max-w-4xl px-5 pb-20">
@@ -44,7 +53,7 @@ export default async function Home() {
           {tenants.map((t) => {
             const types = t.vehicleTypes
               .split(",")
-              .filter((v): v is VehicleType => v in VEHICLE_TYPE_PLURALS)
+              .filter((v): v is VehicleType => Object.hasOwn(VEHICLE_TYPE_PLURALS, v))
               .map((v) => VEHICLE_TYPE_PLURALS[v])
               .join(" · ");
             return (
@@ -55,7 +64,7 @@ export default async function Home() {
                 >
                   <span
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
-                    style={{ background: t.brandColor }}
+                    style={{ background: safeBrandColor(t.brandColor) }}
                   >
                     <Wrench size={18} aria-hidden />
                   </span>

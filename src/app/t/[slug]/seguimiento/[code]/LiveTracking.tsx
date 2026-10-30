@@ -8,28 +8,10 @@ import { CostTable } from "@/components/CostTable";
 import { VehicleTypeIcon, vehicleLabel } from "@/components/VehicleTypeIcon";
 import { STATUS_HINTS, type OrderStatus } from "@/lib/status";
 import { formatCents, formatDate, formatDateTime } from "@/lib/format";
+import type { TrackingData } from "@/lib/tracking";
+import { waNumber } from "@/lib/validation";
 
-export type TrackingData = {
-  order: {
-    trackingCode: string;
-    concern: string;
-    diagnosis: string | null;
-    status: string;
-    estimatedAt: string | null;
-    approvedAt: string | null;
-    createdAt: string;
-    deliveredAt: string | null;
-    updatedAt: string;
-  };
-  vehicle: { type: string; brand: string; model: string; year: number | null; plate: string };
-  customerName: string;
-  // Los costos solo llegan con el PIN de 5 dígitos correcto
-  costUnlocked: boolean;
-  hasItems: boolean;
-  items: { id: string; kind: string; description: string; quantity: number; unitCents: number }[];
-  updates: { id: string; message: string; status: string; photoUrl: string | null; createdAt: string }[];
-  tenant: { name: string; phone: string | null; whatsapp: string | null; brandColor: string };
-};
+export type { TrackingData };
 
 const POLL_MS = 10_000;
 
@@ -41,12 +23,15 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
   // PIN validado por la API; se conserva en sessionStorage para no volver a pedirlo
   const [pin, setPin] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState("");
-  const [pinError, setPinError] = useState(false);
+  // "invalid": PIN incorrecto · "locked": demasiados intentos, bloqueo temporal
+  const [pinError, setPinError] = useState<null | "invalid" | "locked">(null);
   const [pinChecking, setPinChecking] = useState(false);
 
   const fetchData = async (activePin: string | null) => {
-    const qs = activePin ? `?pin=${activePin}` : "";
-    const res = await fetch(`/api/track/${slug}/${code}${qs}`, { cache: "no-store" });
+    const res = await fetch(`/api/track/${slug}/${code}`, {
+      cache: "no-store",
+      headers: activePin ? { "x-cost-pin": activePin } : undefined,
+    });
     if (!res.ok) return null;
     return (await res.json()) as TrackingData;
   };
@@ -98,24 +83,27 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
   // Aprobación de presupuesto: confirmación en 2 pasos
   const [confirmingApproval, setConfirmingApproval] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [approveError, setApproveError] = useState(false);
+  // "changed": el taller modificó el presupuesto mientras el cliente lo veía
+  const [approveError, setApproveError] = useState<null | "changed" | "generic">(null);
 
   const approveBudget = async () => {
     if (!pin || approving) return;
     setApproving(true);
-    setApproveError(false);
+    setApproveError(null);
     try {
       const res = await fetch(`/api/track/${slug}/${code}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, totalCents: total }),
       });
-      if (!res.ok) throw new Error();
+      const body = res.ok ? null : await res.json().catch(() => null);
       const next = await fetchData(pin);
       if (next) applyData(next);
       setConfirmingApproval(false);
+      if (body?.error === "budget_changed") setApproveError("changed");
+      else if (!res.ok) setApproveError("generic");
     } catch {
-      setApproveError(true);
+      setApproveError("generic");
     } finally {
       setApproving(false);
     }
@@ -125,7 +113,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
     e.preventDefault();
     if (pinInput.length !== 5 || pinChecking) return;
     setPinChecking(true);
-    setPinError(false);
+    setPinError(null);
     try {
       const next = await fetchData(pinInput);
       if (next?.costUnlocked) {
@@ -133,10 +121,10 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
         setPin(pinInput);
         applyData(next);
       } else {
-        setPinError(true);
+        setPinError(next?.costLocked ? "locked" : "invalid");
       }
     } catch {
-      setPinError(true);
+      setPinError("invalid");
     } finally {
       setPinChecking(false);
     }
@@ -263,7 +251,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
               <p className="mt-4 flex items-start gap-2.5 rounded-(--radius-card) bg-status-ready/10 p-4 text-sm leading-relaxed">
                 <CircleCheck size={18} className="mt-0.5 shrink-0 text-status-ready" aria-hidden />
                 <span>
-                  Presupuesto <strong>aprobado</strong> el {formatDateTime(order.approvedAt)}.
+                  Presupuesto <strong>aprobado</strong> el {formatDateTime(order.approvedAt)}
                 </span>
               </p>
             )}
@@ -311,7 +299,9 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
                 )}
                 {approveError && (
                   <p role="alert" className="mt-3 text-sm text-danger">
-                    No pudimos registrar tu aprobación. Intenta de nuevo o contacta al taller.
+                    {approveError === "changed"
+                      ? "El taller actualizó el presupuesto mientras lo revisabas. Revisa el nuevo total antes de aprobar."
+                      : "No pudimos registrar tu aprobación. Intenta de nuevo o contacta al taller."}
                   </p>
                 )}
               </div>
@@ -336,7 +326,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
                   value={pinInput}
                   onChange={(e) => {
                     setPinInput(e.target.value.replace(/\D/g, ""));
-                    setPinError(false);
+                    setPinError(null);
                   }}
                   placeholder="•••••"
                   aria-label="Código de costos de 5 dígitos"
@@ -351,7 +341,9 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
                 </button>
                 {pinError && (
                   <p role="alert" className="w-full text-sm text-danger">
-                    Código incorrecto. Verifícalo con el taller.
+                    {pinError === "locked"
+                      ? "Demasiados intentos. Por seguridad, espera 15 minutos o pide el código al taller."
+                      : "Código incorrecto. Verifícalo con el taller."}
                   </p>
                 )}
               </form>
@@ -367,7 +359,7 @@ export function LiveTracking({ slug, code, initial }: { slug: string; code: stri
           <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
             {tenant.whatsapp && (
               <a
-                href={`https://wa.me/${tenant.whatsapp}?text=Hola,%20consulto%20por%20mi%20orden%20${order.trackingCode}`}
+                href={`https://wa.me/${waNumber(tenant.whatsapp)}?text=Hola,%20consulto%20por%20mi%20orden%20${order.trackingCode}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-11 items-center gap-2 rounded-(--radius-control) bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover transition-colors duration-150"

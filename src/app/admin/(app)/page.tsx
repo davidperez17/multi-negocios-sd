@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, CheckCircle2, Circle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { StatusPill } from "@/components/StatusPill";
@@ -9,11 +9,12 @@ import { ORDER_STATUSES, STATUS_LABELS } from "@/lib/status";
 
 export const metadata = { title: "Tablero — TallerLink" };
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ bienvenida?: string }> }) {
   const user = await requireUser();
   const tenantId = user.tenantId;
+  const { bienvenida } = await searchParams;
 
-  const [counts, active] = await Promise.all([
+  const [counts, active, teamSize] = await Promise.all([
     prisma.workOrder.groupBy({
       by: ["status"],
       where: { tenantId },
@@ -25,6 +26,7 @@ export default async function Dashboard() {
       orderBy: { updatedAt: "desc" },
       take: 8,
     }),
+    prisma.user.count({ where: { tenantId } }),
   ]);
 
   const countMap = Object.fromEntries(counts.map((c) => [c.status, c._count]));
@@ -33,8 +35,47 @@ export default async function Dashboard() {
     0
   );
 
+  const totalOrders = counts.reduce((sum, c) => sum + c._count, 0);
+  // Primeros pasos del dueño recién registrado; desaparece al completarlos
+  const steps = [
+    { done: Boolean(user.tenant.address || user.tenant.city), label: "Completa los datos de tu taller", href: "/admin/ajustes" },
+    { done: teamSize > 1, label: "Agrega a tu equipo", href: "/admin/equipo" },
+    { done: totalOrders > 0, label: "Registra tu primer carro", href: "/admin/ordenes/nueva" },
+  ];
+  const showSteps = user.role === "ADMIN" && steps.some((s) => !s.done);
+
   return (
     <>
+      {showSteps && (
+        <section aria-labelledby="primeros-pasos" className="mb-8 rounded-(--radius-card) border border-border p-5">
+          <h2 id="primeros-pasos" className="font-semibold">
+            {bienvenida ? `¡Listo, ${user.name.split(" ")[0]}! Tu taller ya está en TallerLink` : "Primeros pasos"}
+          </h2>
+          <p className="mt-1 text-sm text-muted">Deja listo tu taller en tres pasos.</p>
+          <ol className="mt-4 space-y-1">
+            {steps.map((s) => (
+              <li key={s.href}>
+                <Link
+                  href={s.href}
+                  className="group flex items-center gap-3 rounded-(--radius-control) px-2 py-2 -mx-2 hover:bg-surface transition-colors duration-150"
+                >
+                  {s.done ? (
+                    <CheckCircle2 size={20} className="shrink-0 text-status-ready" aria-hidden />
+                  ) : (
+                    <Circle size={20} className="shrink-0 text-muted" aria-hidden />
+                  )}
+                  <span className={s.done ? "text-muted line-through" : "font-medium"}>{s.label}</span>
+                  <span className="sr-only">{s.done ? "(hecho)" : "(pendiente)"}</span>
+                  {!s.done && (
+                    <ArrowRight size={16} className="ml-auto shrink-0 text-muted group-hover:text-primary" aria-hidden />
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">Tablero</h1>

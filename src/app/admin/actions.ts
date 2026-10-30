@@ -2,29 +2,75 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
-import { generateTrackingCode, generateCostCode } from "@/lib/format";
-import { ORDER_STATUSES, STATUS_LABELS, type OrderStatus } from "@/lib/status";
-
-async function requireUser() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
-  return user;
-}
+import { createSession, destroySession, requireUser } from "@/lib/auth";
+import {
+  addItem as addItemToOrder,
+  changeStatus,
+  createOrder as createOrderForTenant,
+  deleteItem as deleteItemFromOrder,
+  DomainError,
+  type CreateOrderInput,
+} from "@/lib/orders";
+import { savePhoto } from "@/lib/uploads";
+import { authenticate } from "@/lib/login";
+import { registerWorkshop } from "@/lib/signup";
+import { allowByIp } from "@/lib/rate-limit";
+import { addWorker, resetWorkerPassword, setWorkerActive, setWorkerRole } from "@/lib/team";
+import { saveAppearance, saveContact, saveServices } from "@/lib/tenant-settings";
+import {
+  normalizePlate,
+  parseDateOnly,
+  parseMoneyToCents,
+  parseQuantity,
+  parseYear,
+} from "@/lib/validation";
 
 // ── Sesión ────────────────────────────────────────────────────────
 
+// Topes por IP contra abuso (además del bloqueo por cuenta en login.ts)
+const SIGNUPS_PER_IP_PER_HOUR = 5;
+const LOGINS_PER_IP_PER_15MIN = 30;
+
 export async function login(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    redirect("/admin/login?error=1");
+  if (!(await allowByIp("login", LOGINS_PER_IP_PER_15MIN, 15 * 60_000))) {
+    redirect("/admin/login?error=locked");
   }
-  await createSession(user.id, user.tenantId);
+  const result = await authenticate(String(formData.get("email") ?? ""), String(formData.get("password") ?? ""));
+  if (!result.ok) redirect(`/admin/login?error=${result.reason === "locked" ? "locked" : "1"}`);
+  await createSession(result.user.id, result.user.tenantId, result.user.sessionVersion);
   redirect("/admin");
+}
+
+export type SignupState = {
+  error?: string;
+  // Lo que escribió (sin contraseña) para no vaciar el formulario si hay un error
+  values?: { workshopName: string; ownerName: string; whatsapp: string; email: string };
+};
+
+export async function signup(_prev: SignupState, formData: FormData): Promise<SignupState> {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  const values = {
+    workshopName: field("workshopName"),
+    ownerName: field("ownerName"),
+    whatsapp: field("whatsapp"),
+    email: field("email"),
+  };
+  // Honeypot: campo oculto que una persona deja vacío y un bot suele llenar
+  if (field("website")) return { error: "retry", values };
+  if (!(await allowByIp("signup", SIGNUPS_PER_IP_PER_HOUR, 60 * 60_000))) {
+    return { error: "rate_limited", values };
+  }
+
+  let res: { tenantId: string; userId: string };
+  try {
+    res = await registerWorkshop({ ...values, password: field("password") });
+  } catch (e) {
+    if (e instanceof DomainError) return { error: e.code, values };
+    throw e;
+  }
+  await createSession(res.userId, res.tenantId);
+  redirect("/admin?bienvenida=1");
 }
 
 export async function logout() {
@@ -37,130 +83,69 @@ export async function logout() {
 export async function createOrder(formData: FormData) {
   const user = await requireUser();
   const tenantId = user.tenantId;
+  const field = (k: string) => String(formData.get(k) ?? "").trim();
 
-  const customerId = String(formData.get("customerId") ?? "");
-  const customerName = String(formData.get("customerName") ?? "").trim();
-  const customerPhone = String(formData.get("customerPhone") ?? "").trim();
-
-  const vehicleId = String(formData.get("vehicleId") ?? "");
-  const vehicleType = String(formData.get("vehicleType") ?? "CAR");
-  const brand = String(formData.get("brand") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim();
-  const yearRaw = String(formData.get("year") ?? "").trim();
-  const plate = String(formData.get("plate") ?? "").trim().toUpperCase();
-
-  const concern = String(formData.get("concern") ?? "").trim();
-  const estimatedAtRaw = String(formData.get("estimatedAt") ?? "").trim();
-
+  const customerId = field("customerId");
+  const vehicleId = field("vehicleId");
+  const concern = field("concern");
   if (!concern) redirect("/admin/ordenes/nueva?error=concern");
 
-  let finalCustomerId = customerId;
-  if (!finalCustomerId) {
-    if (!customerName || !customerPhone) redirect("/admin/ordenes/nueva?error=customer");
-    const customer = await prisma.customer.create({
-      data: { tenantId, name: customerName, phone: customerPhone },
-    });
-    finalCustomerId = customer.id;
+  const estimatedAt = parseDateOnly(field("estimatedAt"));
+  if (estimatedAt === "invalid") redirect("/admin/ordenes/nueva?error=date");
+
+  let customer: CreateOrderInput["customer"];
+  if (!customerId) {
+    const name = field("customerName");
+    const phone = field("customerPhone");
+    if (!name || !phone) redirect("/admin/ordenes/nueva?error=customer");
+    customer = { name, phone };
   }
 
-  let finalVehicleId = vehicleId;
-  if (!finalVehicleId) {
+  let vehicle: CreateOrderInput["vehicle"];
+  if (!vehicleId) {
+    const brand = field("brand");
+    const model = field("model");
+    const plate = normalizePlate(field("plate"));
+    const year = parseYear(field("year"));
     if (!brand || !model || !plate) redirect("/admin/ordenes/nueva?error=vehicle");
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        tenantId,
-        customerId: finalCustomerId,
-        type: vehicleType,
-        brand,
-        model,
-        year: yearRaw ? Number(yearRaw) : null,
-        plate,
-      },
-    });
-    finalVehicleId = vehicle.id;
+    if (year === "invalid") redirect("/admin/ordenes/nueva?error=year");
+    vehicle = { type: field("vehicleType") || "CAR", brand, model, year, plate };
   }
 
-  // Reintenta si el código aleatorio colisiona (unique)
-  let order = null;
-  for (let attempt = 0; attempt < 3 && !order; attempt++) {
-    try {
-      order = await prisma.workOrder.create({
-        data: {
-          tenantId,
-          customerId: finalCustomerId,
-          vehicleId: finalVehicleId,
-          trackingCode: generateTrackingCode(),
-          costCode: generateCostCode(),
-          concern,
-          estimatedAt: estimatedAtRaw ? new Date(estimatedAtRaw) : null,
-          updates: {
-            create: {
-              message: "Vehículo recibido. Ingresa a cola de diagnóstico.",
-              status: "RECEIVED",
-            },
-          },
-        },
-      });
-    } catch {
-      if (attempt === 2) throw new Error("No se pudo generar un código de seguimiento único");
-    }
+  let order: { id: string };
+  try {
+    order = await createOrderForTenant(tenantId, {
+      customerId: customerId || undefined,
+      customer,
+      vehicleId: vehicleId || undefined,
+      vehicle,
+      concern,
+      estimatedAt,
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/nueva?error=${e.code}`);
+    throw e;
   }
 
   revalidatePath("/admin");
-  redirect(`/admin/ordenes/${order!.id}`);
+  redirect(`/admin/ordenes/${order.id}`);
 }
 
 export async function setOrderStatus(formData: FormData) {
   const user = await requireUser();
   const orderId = String(formData.get("orderId") ?? "");
-  const status = String(formData.get("status") ?? "") as OrderStatus;
-  const message = String(formData.get("message") ?? "").trim();
-
-  if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number]) && status !== "CANCELLED") {
-    return;
+  try {
+    await changeStatus(user.tenantId, orderId, String(formData.get("status") ?? ""), {
+      fromStatus: String(formData.get("fromStatus") ?? "") || undefined,
+      message: String(formData.get("message") ?? "").trim(),
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/${orderId}?error=${e.code}`);
+    throw e;
   }
-
-  const order = await prisma.workOrder.findFirst({
-    where: { id: orderId, tenantId: user.tenantId },
-  });
-  if (!order) return;
-
-  await prisma.workOrder.update({
-    where: { id: orderId },
-    data: {
-      status,
-      deliveredAt: status === "DELIVERED" ? new Date() : order.deliveredAt,
-      updates: {
-        create: {
-          message: message || `Estado actualizado: ${STATUS_LABELS[status]}.`,
-          status,
-        },
-      },
-    },
-  });
 
   revalidatePath(`/admin/ordenes/${orderId}`);
   revalidatePath("/admin");
-}
-
-// Tipos de imagen permitidos en fotos de avances
-const PHOTO_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-
-async function savePhoto(file: File, tenantId: string): Promise<string | null> {
-  const ext = PHOTO_TYPES[file.type];
-  if (!ext || file.size === 0 || file.size > PHOTO_MAX_BYTES) return null;
-  const { mkdir, writeFile } = await import("node:fs/promises");
-  const path = await import("node:path");
-  const dir = path.join(process.cwd(), "public", "uploads", tenantId);
-  await mkdir(dir, { recursive: true });
-  const name = `${crypto.randomUUID()}.${ext}`;
-  await writeFile(path.join(dir, name), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/${tenantId}/${name}`;
 }
 
 export async function publishUpdate(formData: FormData) {
@@ -174,9 +159,13 @@ export async function publishUpdate(formData: FormData) {
   });
   if (!order) return;
 
+  // Si viene foto y no es válida, no se publica el avance: el taller debe enterarse
   const photo = formData.get("photo");
-  const photoUrl =
-    photo instanceof File && photo.size > 0 ? await savePhoto(photo, user.tenantId) : null;
+  let photoUrl: string | null = null;
+  if (photo instanceof File && photo.size > 0) {
+    photoUrl = await savePhoto(photo, user.tenantId);
+    if (!photoUrl) redirect(`/admin/ordenes/${orderId}?error=photo`);
+  }
 
   await prisma.progressUpdate.create({
     data: { workOrderId: orderId, message, status: order.status, photoUrl },
@@ -202,41 +191,28 @@ export async function saveDiagnosis(formData: FormData) {
 export async function addItem(formData: FormData) {
   const user = await requireUser();
   const orderId = String(formData.get("orderId") ?? "");
-  const kind = String(formData.get("kind") ?? "LABOR");
-  const description = String(formData.get("description") ?? "").trim();
-  const quantity = Math.max(1, Number(formData.get("quantity") ?? 1));
-  const price = Number(String(formData.get("price") ?? "0").replace(",", "."));
+  const quantity = parseQuantity(String(formData.get("quantity") ?? ""));
+  const unitCents = parseMoneyToCents(String(formData.get("price") ?? ""));
+  if (quantity === null || unitCents === null) redirect(`/admin/ordenes/${orderId}?error=invalid_item`);
 
-  if (!description || !Number.isFinite(price) || price <= 0) return;
-
-  const order = await prisma.workOrder.findFirst({
-    where: { id: orderId, tenantId: user.tenantId },
-  });
-  if (!order) return;
-
-  await prisma.workOrderItem.create({
-    data: {
-      workOrderId: orderId,
-      kind: kind === "PART" ? "PART" : "LABOR",
-      description,
+  try {
+    await addItemToOrder(user.tenantId, orderId, {
+      kind: String(formData.get("kind") ?? "LABOR"),
+      description: String(formData.get("description") ?? ""),
       quantity,
-      unitCents: Math.round(price * 100),
-    },
-  });
+      unitCents,
+    });
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ordenes/${orderId}?error=${e.code}`);
+    throw e;
+  }
   revalidatePath(`/admin/ordenes/${orderId}`);
 }
 
 export async function deleteItem(formData: FormData) {
   const user = await requireUser();
-  const itemId = String(formData.get("itemId") ?? "");
-  const item = await prisma.workOrderItem.findUnique({
-    where: { id: itemId },
-    include: { workOrder: { select: { id: true, tenantId: true } } },
-  });
-  if (!item || item.workOrder.tenantId !== user.tenantId) return;
-
-  await prisma.workOrderItem.delete({ where: { id: itemId } });
-  revalidatePath(`/admin/ordenes/${item.workOrder.id}`);
+  const orderId = await deleteItemFromOrder(user.tenantId, String(formData.get("itemId") ?? ""));
+  if (orderId) revalidatePath(`/admin/ordenes/${orderId}`);
 }
 
 // ── Clientes ──────────────────────────────────────────────────────
@@ -255,40 +231,122 @@ export async function createCustomer(formData: FormData) {
   redirect("/admin/clientes");
 }
 
-// ── Ajustes del tenant ────────────────────────────────────────────
+// ── Ajustes del tenant (una acción por pestaña) ───────────────────
 
-export async function updateTenantSettings(formData: FormData) {
+type SettingsTab = "pagina" | "contacto" | "servicios";
+
+async function settingsAction(tab: SettingsTab, fn: (tenantId: string) => Promise<string | void>) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/admin/ajustes?error=role");
-
-  const fields = [
-    "name",
-    "tagline",
-    "description",
-    "phone",
-    "whatsapp",
-    "email",
-    "address",
-    "city",
-    "schedule",
-    "services",
-    "brandColor",
-  ] as const;
-
-  const data: Record<string, string | null> = {};
-  for (const f of fields) {
-    const v = String(formData.get(f) ?? "").trim();
-    data[f] = v || null;
+  if (user.role !== "ADMIN") redirect(`/admin/ajustes?tab=${tab}&error=role`);
+  let extra: string | void;
+  try {
+    extra = await fn(user.tenantId);
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/ajustes?tab=${tab}&error=${e.code}`);
+    throw e;
   }
-  // Nombre y color nunca vacíos
-  if (!data.name) delete data.name;
-  if (!data.brandColor) delete data.brandColor;
-
-  const types = formData.getAll("vehicleTypes").map(String).filter(Boolean);
-  if (types.length > 0) data.vehicleTypes = types.join(",");
-
-  await prisma.tenant.update({ where: { id: user.tenantId }, data });
-  revalidatePath("/admin/ajustes");
+  revalidatePath("/admin", "layout");
   revalidatePath(`/t/${user.tenant.slug}`);
-  redirect("/admin/ajustes?saved=1");
+  redirect(`/admin/ajustes?tab=${tab}&saved=1${extra ?? ""}`);
+}
+
+const fileField = (formData: FormData, k: string) => {
+  const f = formData.get(k);
+  return f instanceof File && f.size > 0 ? f : null;
+};
+
+export async function saveAppearanceAction(formData: FormData) {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await settingsAction("pagina", async (tenantId) => {
+    const res = await saveAppearance(tenantId, {
+      name: field("name"),
+      tagline: field("tagline"),
+      brandColor: field("brandColor"),
+      heroStyle: field("heroStyle"),
+      foundedYear: field("foundedYear"),
+      showDeliveredCount: formData.get("showDeliveredCount") === "on",
+      useWeeklyHours: field("useWeeklyHours") === "1",
+      weeklyHours: field("weeklyHours"),
+      schedule: field("schedule"),
+      logo: fileField(formData, "logo"),
+      removeLogo: field("removeLogo") === "1",
+      storefront: fileField(formData, "storefront"),
+      removeStorefront: field("removeStorefront") === "1",
+    });
+    return res.colorAdjusted ? "&ajustado=1" : undefined;
+  });
+}
+
+export async function saveContactAction(formData: FormData) {
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await settingsAction("contacto", (tenantId) =>
+    saveContact(tenantId, {
+      whatsapp: field("whatsapp"),
+      phone: field("phone"),
+      email: field("email"),
+      address: field("address"),
+      city: field("city"),
+      mapsUrl: field("mapsUrl"),
+    })
+  );
+}
+
+export async function saveServicesAction(formData: FormData) {
+  await settingsAction("servicios", (tenantId) =>
+    saveServices(tenantId, {
+      services: formData.getAll("services").map(String),
+      vehicleTypes: formData.getAll("vehicleTypes").map(String),
+      description: String(formData.get("description") ?? ""),
+    })
+  );
+}
+
+// ── Equipo ────────────────────────────────────────────────────────
+
+async function teamAction(fn: () => Promise<unknown>, okFlag: string) {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof DomainError) redirect(`/admin/equipo?error=${e.code}`);
+    throw e;
+  }
+  revalidatePath("/admin/equipo");
+  redirect(`/admin/equipo?ok=${okFlag}`);
+}
+
+export async function createWorker(formData: FormData) {
+  const user = await requireUser();
+  const field = (k: string) => String(formData.get(k) ?? "");
+  await teamAction(
+    () =>
+      addWorker(user, {
+        name: field("name"),
+        email: field("email"),
+        password: field("password"),
+        role: field("role") || "STAFF",
+      }),
+    "added"
+  );
+}
+
+export async function toggleWorker(formData: FormData) {
+  const user = await requireUser();
+  const active = formData.get("active") === "1";
+  await teamAction(() => setWorkerActive(user, String(formData.get("userId") ?? ""), active), active ? "enabled" : "disabled");
+}
+
+export async function changeWorkerRole(formData: FormData) {
+  const user = await requireUser();
+  await teamAction(
+    () => setWorkerRole(user, String(formData.get("userId") ?? ""), String(formData.get("role") ?? "")),
+    "role"
+  );
+}
+
+export async function changeWorkerPassword(formData: FormData) {
+  const user = await requireUser();
+  await teamAction(
+    () => resetWorkerPassword(user, String(formData.get("userId") ?? ""), String(formData.get("password") ?? "")),
+    "password"
+  );
 }

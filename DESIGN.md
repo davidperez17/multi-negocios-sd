@@ -35,7 +35,7 @@ Mood: **bahía de servicio calibrada** — luz blanca de inspección, herramient
 }
 ```
 
-- Tenant puede sobreescribir `--primary` en su landing pública (branding propio); el admin de la plataforma mantiene el plum.
+- Tenant sobreescribe `--primary` (y hover/soft derivados) con su color de marca en su landing pública **y en su panel `/admin`** vía `tenantThemeVars()`. Las pantallas sin tenant (portada, login, registro) mantienen el plum de TallerLink. El color se guarda en OKLCH y se oscurece al guardar si el texto blanco encima no llega a 4.5:1.
 - Texto blanco sobre cualquier fill saturado de L 0.42–0.78 (botones, pills). Texto oscuro solo sobre fills pálidos (L > 0.85).
 
 ## Typography
@@ -50,7 +50,9 @@ Mood: **bahía de servicio calibrada** — luz blanca de inspección, herramient
 
 - Escala de 4px: 4/8/12/16/24/32/48/64.
 - Admin: sidebar fija (colapsa a barra inferior en móvil) + área de contenido max-w-6xl. Tablas densas permitidas.
-- Landing pública: secciones a ancho completo, contenido max-w-5xl, mobile-first a 390px.
+- Landing pública: secciones a ancho completo, contenido max-w-5xl, mobile-first a 390px. Medidas por contenedor (`@container`), no por ventana, para que la vista previa de Ajustes sea fiel.
+- **Landing = una sola acción**: "¿Cómo va tu {carro|moto|camión}?" + campo con `TX-` fijo + "Ver mi …". Debajo, confianza real (vehículos entregados de verdad, año de apertura). Luego "Lo que hacemos" y "Visítanos" (foto del local opcional junto a la dirección, Google Maps/Waze, horario). Nunca fotos de fondo: muchos talleres no son bonitos y la página debe verse completa sin imágenes. Sin logo se muestra solo el nombre en letras, sin recuadro de iniciales.
+- **Fondo del encabezado**: Liso, Degradado, Puntos o Líneas, siempre con el color de marca y **nunca más claro que él** (el color de marca ya garantiza 4.5:1 con texto blanco).
 - Radios: 8px controles, 12px cards, pills full. Z-scale semántica: dropdown 10 < sticky 20 < backdrop 30 < modal 40 < toast 50 < tooltip 60.
 
 ## Components

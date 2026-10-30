@@ -15,9 +15,25 @@ import { CopyLinkButton } from "./CopyLinkButton";
 const inputCls =
   "w-full h-10 rounded-(--radius-control) border border-border bg-bg px-3 text-sm placeholder:text-muted";
 
-export default async function OrderDetail({ params }: { params: Promise<{ id: string }> }) {
+// Mensajes para ?error=<code> que devuelven los server actions
+const ERROR_MESSAGES: Record<string, string> = {
+  stale_status: "Otra persona cambió el estado de esta orden. Revisa el estado actual e inténtalo de nuevo.",
+  invalid_status: "Estado no válido.",
+  invalid_item: "Revisa el concepto: cantidad entera de 1 a 999 y precio mayor a Q0 (ej. 1,500.00).",
+  photo: "No se pudo subir la foto. Usa JPG, PNG o WebP de hasta 5 MB. El avance no se publicó.",
+  order_not_found: "La orden no existe.",
+};
+
+export default async function OrderDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const user = await requireUser();
   const { id } = await params;
+  const { error } = await searchParams;
 
   const order = await prisma.workOrder.findFirst({
     where: { id, tenantId: user.tenantId },
@@ -44,6 +60,12 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
         <ArrowLeft size={15} aria-hidden />
         Órdenes
       </Link>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-(--radius-control) border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          {ERROR_MESSAGES[error] ?? "No se pudo completar la acción."}
+        </p>
+      )}
 
       {/* Encabezado */}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
@@ -91,6 +113,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
         {order.status !== "DELIVERED" && order.status !== "CANCELLED" && (
           <form action={setOrderStatus} className="mt-8 grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-end">
             <input type="hidden" name="orderId" value={order.id} />
+            <input type="hidden" name="fromStatus" value={order.status} />
             <div>
               <label htmlFor="status" className="block text-sm font-medium mb-1.5">
                 Cambiar estado
@@ -162,11 +185,10 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
                 />
                 <input
                   name="price"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  type="text"
+                  inputMode="decimal"
                   required
-                  placeholder="Precio unit. Q"
+                  placeholder="Q 0.00"
                   aria-label="Precio unitario"
                   className={inputCls}
                 />

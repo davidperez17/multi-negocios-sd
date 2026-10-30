@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { siteUrl } from "@/lib/site";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: siteUrl(),
   title: "TallerLink — Gestión para talleres",
   description:
     "SaaS multi-tenant para talleres de carros, motos y camiones: administra tu negocio y dale a tus clientes seguimiento en tiempo real.",

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
@@ -56,7 +57,9 @@ export default async function LoginPage({
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.
+              {error === "locked"
+                ? "Demasiados intentos fallidos. Por seguridad, espera 15 minutos e intenta de nuevo."
+                : "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo."}
             </p>
           )}
           <button
@@ -66,6 +69,13 @@ export default async function LoginPage({
             Entrar
           </button>
         </form>
+
+        <p className="mt-6 text-sm text-muted">
+          ¿Tu taller aún no está en TallerLink?{" "}
+          <Link href="/registro" className="font-medium text-primary hover:underline underline-offset-4">
+            Pruébalo gratis 30 días
+          </Link>
+        </p>
 
         <div className="mt-8 rounded-(--radius-card) bg-surface p-4 text-xs text-muted leading-relaxed">
           <p className="font-semibold text-ink mb-1">Cuentas demo</p>

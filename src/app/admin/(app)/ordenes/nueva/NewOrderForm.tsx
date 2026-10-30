@@ -15,6 +15,15 @@ const inputCls =
   "w-full h-11 rounded-(--radius-control) border border-border bg-bg px-3.5 placeholder:text-muted";
 const labelCls = "block text-sm font-medium mb-1.5";
 
+// Mensajes para ?error=<code> de createOrder
+const ERROR_MESSAGES: Record<string, string> = {
+  year: "El año del vehículo no es válido (ej. 2019).",
+  date: "La fecha estimada de entrega no es válida.",
+  customer_not_found: "El cliente seleccionado ya no existe. Recarga la página.",
+  vehicle_not_found: "El vehículo seleccionado no pertenece a ese cliente. Recarga la página.",
+  invalid_vehicle: "Tipo de vehículo no válido.",
+};
+
 export function NewOrderForm({ customers, error }: { customers: CustomerOption[]; error?: string }) {
   const [customerId, setCustomerId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
@@ -166,7 +175,7 @@ export function NewOrderForm({ customers, error }: { customers: CustomerOption[]
 
       {error && (
         <p role="alert" className="text-sm text-danger">
-          Faltan datos obligatorios. Revisa cliente, vehículo y motivo de ingreso.
+          {ERROR_MESSAGES[error] ?? "Faltan datos obligatorios. Revisa cliente, vehículo y motivo de ingreso."}
         </p>
       )}
 

@@ -11,11 +11,21 @@ const prisma = new PrismaClient({ adapter });
 function hoursAgo(h: number) {
   return new Date(Date.now() - h * 3600_000);
 }
+// Lunes a viernes de 8 a 12 y de 2 a 6
+const SPLIT_DAY = [
+  ["08:00", "12:00"],
+  ["14:00", "18:00"],
+];
+
 function daysFromNow(d: number) {
   return new Date(Date.now() + d * 86400_000);
 }
 
 async function main() {
+  // El seed borra todos los tenants: nunca contra una base de producción
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORCE !== "1") {
+    throw new Error("db:seed borra todos los datos. En producción requiere SEED_FORCE=1.");
+  }
   await prisma.tenant.deleteMany();
 
   const passwordHash = await bcrypt.hash("demo1234", 10);
@@ -38,6 +48,18 @@ async function main() {
       services:
         "Diagnóstico computarizado\nAfinación mayor y menor\nFrenos y suspensión\nTransmisión y clutch\nSistema eléctrico\nAire acondicionado",
       schedule: "Lun-Vie 8:00-18:00 · Sáb 8:00-14:00",
+      // Landing personalizable: horario con cierre al mediodía y año de apertura
+      heroStyle: "GRADIENT",
+      foundedYear: 1998,
+      weeklyHours: JSON.stringify({
+        0: [],
+        1: SPLIT_DAY,
+        2: SPLIT_DAY,
+        3: SPLIT_DAY,
+        4: SPLIT_DAY,
+        5: SPLIT_DAY,
+        6: [["08:00", "13:00"]],
+      }),
       users: {
         create: [
           { name: "Marco Rodríguez", email: "marco@tallerrodriguez.gt", passwordHash, role: "ADMIN" },
@@ -216,7 +238,9 @@ async function main() {
       vehicleTypes: "MOTORCYCLE",
       services:
         "Servicio general\nCambio de llantas\nCarburación e inyección\nFrenos y suspensión\nPreparación para ruta",
+      // Sin horario por día: muestra el texto libre (talleres que aún no lo configuran)
       schedule: "Mar-Sáb 9:00-19:00",
+      heroStyle: "DOTS",
       users: {
         create: [
           { name: "Camila Vélez", email: "camila@motogaragevelez.gt", passwordHash, role: "ADMIN" },
